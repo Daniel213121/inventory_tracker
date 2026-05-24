@@ -10,11 +10,9 @@ import { motion } from 'framer-motion'
 import { Eye, EyeOff } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Icon } from '../../../components/icons/Icon'
-import { toast } from 'sonner'
-
-const DEMO_EMAIL    = 'akua.sarpong@virtualsecurity.africa'
-const DEMO_PASSWORD = 'demo1234'
+import { Icon }      from '../../../components/icons/Icon'
+import { toast }      from 'sonner'
+import { loginUser }  from '../../actions/auth'
 
 const Spinner = () => (
   <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-current opacity-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -42,16 +40,25 @@ export default function LoginPage() {
 
   const { register, handleSubmit, formState: { errors } } = useForm<Fields>({
     resolver: zodResolver(schema),
-    defaultValues: { email: DEMO_EMAIL, password: DEMO_PASSWORD },
+    defaultValues: { email: '', password: '' },
   })
 
-  const onSubmit = (data: Fields) => {
+  const onSubmit = async (data: Fields) => {
     setIsSubmitting(true)
-    setTimeout(() => {
-      localStorage.setItem('auth_user', JSON.stringify({ email: data.email, name: 'Akua Sarpong', id: 'u01' }))
-      toast.success('Welcome back, Akua Sarpong!', { description: 'Redirecting to your dashboard…' })
+    try {
+      const result = await loginUser(data.email, data.password)
+      if (!result.success) {
+        toast.error(result.error)
+        setIsSubmitting(false)
+        return
+      }
+      localStorage.setItem('auth_user', JSON.stringify(result.user))
+      toast.success(`Welcome back, ${result.user.name}!`, { description: 'Redirecting to your dashboard…' })
       setTimeout(() => router.push('/dashboard'), 1000)
-    }, 1500)
+    } catch {
+      toast.error('Something went wrong. Please try again.')
+      setIsSubmitting(false)
+    }
   }
 
   return (

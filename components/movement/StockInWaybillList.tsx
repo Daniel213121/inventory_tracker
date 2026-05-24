@@ -1,44 +1,26 @@
 'use client'
 
-import { Icon }       from '../icons/Icon'
-import { ITEM_BY_ID, WAYBILL_BY_ID, fmtDate } from '../../lib/data'
+import { Icon } from '../icons/Icon'
 import type { Movement } from '../../lib/types'
 
-/* ─── Utility: items still out grouped by waybill ───────────────────────── */
-import { MOVEMENTS } from '../../lib/data'
-
-export function getDispatchedByWaybill(companyId: string): [string, Movement[]][] {
-  const sorted = [...MOVEMENTS]
-    .filter(m => m.companyId === companyId)
-    .sort((a, b) => new Date(a.movedAt).getTime() - new Date(b.movedAt).getTime())
-
-  const byItem = new Map<string, Movement>()
-  sorted.forEach(m => {
-    if (m.type === 'OUT' && m.waybillId) byItem.set(m.itemId, m)
-    else byItem.delete(m.itemId)
-  })
-
-  const byWaybill = new Map<string, Movement[]>()
-  for (const m of byItem.values()) {
-    const key = m.waybillId!
-    if (!byWaybill.has(key)) byWaybill.set(key, [])
-    byWaybill.get(key)!.push(m)
-  }
-
-  return [...byWaybill.entries()]
-    .sort(([, a], [, b]) =>
-      new Date(b[0].movedAt).getTime() - new Date(a[0].movedAt).getTime()
-    )
+export interface WaybillGroup {
+  waybillId:     string
+  waybillNumber: string
+  suppliedTo:    string
+  date:          string
+  movements:     Movement[]
 }
 
-/* ─── Component ─────────────────────────────────────────────────────────── */
-
 interface Props {
-  waybillGroups:    [string, Movement[]][]
+  waybillGroups:    WaybillGroup[]
   selectedId:       string | null
   expandedWaybills: Set<string>
   onSelectRow:      (id: string) => void
   onToggleWaybill:  (waybillId: string) => void
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 export function StockInWaybillList({
@@ -64,11 +46,10 @@ export function StockInWaybillList({
           <div className="muted" style={{ fontSize: 14 }}>All items are currently in stock.</div>
         </div>
       ) : (
-        waybillGroups.map(([waybillId, movements]) => {
-          const waybill = WAYBILL_BY_ID[waybillId]
+        waybillGroups.map(group => {
+          const { waybillId, waybillNumber, suppliedTo, date, movements } = group
           return (
             <div key={waybillId}>
-              {/* Group header */}
               <div
                 onClick={() => onToggleWaybill(waybillId)}
                 style={{
@@ -85,23 +66,21 @@ export function StockInWaybillList({
                   stroke="var(--text-2)"
                 />
                 <span className="t-mono" style={{ fontWeight: 700, color: 'var(--secondary)', fontSize: 13 }}>
-                  {waybill?.number ?? waybillId}
+                  {waybillNumber}
                 </span>
-                <span style={{ fontSize: 13 }}>{waybill?.suppliedTo}</span>
+                <span style={{ fontSize: 13 }}>{suppliedTo}</span>
                 <span className="muted" style={{ fontSize: 12 }}>·</span>
-                <span className="muted" style={{ fontSize: 12 }}>{waybill ? fmtDate(waybill.date) : ''}</span>
+                <span className="muted" style={{ fontSize: 12 }}>{fmtDate(date)}</span>
                 <span className="muted" style={{ fontSize: 12 }}>·</span>
                 <span className="muted" style={{ fontSize: 12 }}>
                   {movements.length} item{movements.length !== 1 ? 's' : ''} out
                 </span>
               </div>
 
-              {/* Items table — only when expanded */}
               {expandedWaybills.has(waybillId) && (
                 <table className="tbl">
                   <tbody>
                     {movements.map(m => {
-                      const item   = ITEM_BY_ID[m.itemId]
                       const active = selectedId === m.id
                       return (
                         <tr
@@ -120,16 +99,16 @@ export function StockInWaybillList({
                             </div>
                           </td>
                           <td style={{ fontWeight: 500, fontSize: 13 }}>
-                            {item?.name}
+                            {m.itemName}
                             <div className="muted" style={{ fontSize: 11, marginTop: 1 }}>
-                              {item?.isSerialised
+                              {m.itemIsSerialised
                                 ? `${(m.serialsDispatched ?? []).length} serial${(m.serialsDispatched ?? []).length !== 1 ? 's' : ''} dispatched`
                                 : 'Qty tracked'}
                             </div>
                           </td>
                           <td style={{ fontWeight: 600 }}>{m.quantity}</td>
                           <td style={{ fontSize: 12 }}>
-                            {item?.isSerialised ? (
+                            {m.itemIsSerialised ? (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                 {(m.serialsDispatched ?? []).map(s => (
                                   <span key={s} className="t-mono" style={{

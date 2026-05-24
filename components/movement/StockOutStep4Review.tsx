@@ -1,29 +1,24 @@
-import { ITEM_BY_ID, COMPANY_BY_ID, WAYBILLS } from '../../lib/data'
 import type { Line, Details } from './stockout-types'
+import type { ConditionValue } from '../../lib/types'
+
+const COND_LABEL: Record<ConditionValue, string> = { NEW: 'New', USED: 'Used', FAULTY: 'Faulty' }
 
 interface Props {
-  companyId: string
-  lines:     Line[]
-  details:   Details
+  company:  { name: string; code: string; waybillSequence: number }
+  lines:    Line[]
+  details:  Details
 }
 
-export function StockOutStep4Review({ companyId, lines, details }: Props) {
-  const company = COMPANY_BY_ID[companyId]
-  const year    = new Date(details.date || Date.now()).getFullYear()
-  const seq     = details.destinationCode
-    ? WAYBILLS.filter(w =>
-        w.companyId === companyId &&
-        w.destinationCode === details.destinationCode &&
-        new Date(w.date).getFullYear() === year
-      ).length + 1
-    : 0
-  const waybillNum = company && details.destinationCode
-    ? `${company.code}/${details.destinationCode}/${year}/${String(seq).padStart(2, '0')}`
+export function StockOutStep4Review({ company, lines, details }: Props) {
+  const year       = new Date(details.date || Date.now()).getFullYear()
+  const nextSeq    = String(company.waybillSequence + 1).padStart(2, '0')
+  const waybillNum = company.code && details.destinationCode
+    ? `${company.code}/${details.destinationCode}/${year}/${nextSeq}`
     : '—'
   const totalUnits = lines.reduce((s, l) => s + l.qty, 0)
 
   const summaryFields: [string, string | undefined][] = [
-    ['Company',          company?.name],
+    ['Company',          company.name],
     ['Supplied To',      details.suppliedTo],
     ['Destination Code', details.destinationCode],
     ['Driver',           details.driverName],
@@ -61,20 +56,17 @@ export function StockOutStep4Review({ companyId, lines, details }: Props) {
         <thead>
           <tr>
             <th>Item</th>
-            <th>Serial numbers dispatched</th>
+            <th>Condition / Serials</th>
             <th style={{ textAlign: 'right' }}>Qty</th>
           </tr>
         </thead>
         <tbody>
-          {lines.map(l => {
-            const item = ITEM_BY_ID[l.itemId]
-            return (
-              <tr key={l.itemId}>
-                <td style={{ fontWeight: 500, fontSize: 13 }}>{item?.name}</td>
-                <td>
-                  {!item?.isSerialised ? (
-                    <span className="muted" style={{ fontSize: 12 }}>—</span>
-                  ) : l.selectedSerials.length > 0 ? (
+          {lines.map(l => (
+            <tr key={l.itemId}>
+              <td style={{ fontWeight: 500, fontSize: 13 }}>{l.itemName}</td>
+              <td>
+                {l.isSerialised ? (
+                  l.selectedSerials.length > 0 ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       {l.selectedSerials.map(s => (
                         <span key={s} className="t-mono" style={{
@@ -88,12 +80,22 @@ export function StockOutStep4Review({ companyId, lines, details }: Props) {
                     </div>
                   ) : (
                     <span className="muted" style={{ fontSize: 12 }}>No serials selected</span>
-                  )}
-                </td>
-                <td style={{ textAlign: 'right', fontWeight: 600 }}>{l.qty}</td>
-              </tr>
-            )
-          })}
+                  )
+                ) : (
+                  l.conditionFrom ? (
+                    <span style={{
+                      fontSize: 12, padding: '2px 8px', borderRadius: 4, fontWeight: 500,
+                      background: l.conditionFrom === 'NEW' ? '#dcfce7' : l.conditionFrom === 'USED' ? '#fef9c3' : '#fee2e2',
+                      color:      l.conditionFrom === 'NEW' ? '#15803d' : l.conditionFrom === 'USED' ? '#854d0e' : '#991b1b',
+                    }}>
+                      {COND_LABEL[l.conditionFrom]}
+                    </span>
+                  ) : <span className="muted" style={{ fontSize: 12 }}>—</span>
+                )}
+              </td>
+              <td style={{ textAlign: 'right', fontWeight: 600 }}>{l.qty}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
 

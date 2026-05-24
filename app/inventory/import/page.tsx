@@ -11,7 +11,8 @@ import { Button }         from '@/components/ui/button'
 import { Icon }           from '../../../components/icons/Icon'
 import { ImportUpload }   from '../../../components/inventory/ImportUpload'
 import { ImportPreview, type ImportRow } from '../../../components/inventory/ImportPreview'
-import { INVENTORY, COMPANIES } from '../../../lib/data'
+import { listCompanies }  from '@/app/actions/settings'
+import { listCategories, importInventoryItems } from '@/app/actions/inventory'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -25,12 +26,10 @@ const TEMPLATE_COLUMNS = [
 ]
 
 const SAMPLE_ROWS = [
-  // Same item, different serial per row — this is how you import 10 keyboards
-  ['Logitech MK540 Keyboard', 'Logitech', 'MK540 Advanced', 'LGT-MK540-001', 'PERIPHERAL', 'NEW', 1, 5, 'Persol Systems', '2026-05-22', 'Wireless keyboard + mouse combo', ''],
-  ['Logitech MK540 Keyboard', 'Logitech', 'MK540 Advanced', 'LGT-MK540-002', 'PERIPHERAL', 'NEW', 1, 5, 'Persol Systems', '2026-05-22', 'Wireless keyboard + mouse combo', ''],
-  ['Logitech MK540 Keyboard', 'Logitech', 'MK540 Advanced', 'LGT-MK540-003', 'PERIPHERAL', 'NEW', 1, 5, 'Persol Systems', '2026-05-22', 'Wireless keyboard + mouse combo', ''],
-  // Different item below
-  ['Samsung 870 EVO 1TB', 'Samsung', 'MZ-77E1T0B/AM', 'SAM-870-001', 'SSD', 'NEW', 1, 2, 'Compu-Ghana Ltd', '2026-05-22', '2.5" SATA III SSD', ''],
+  // Multiple serials for one item — comma-separated in the Serial Number cell
+  ['Logitech MK540 Keyboard', 'Logitech', 'MK540 Advanced', 'LGT-MK540-001, LGT-MK540-002, LGT-MK540-003', 'PERIPHERAL', 'NEW', '', 5, 'Persol Systems', '2026-05-22', 'Wireless keyboard + mouse combo', ''],
+  // Single serial item
+  ['Samsung 870 EVO 1TB', 'Samsung', 'MZ-77E1T0B/AM', 'SAM-870-001', 'SSD', 'NEW', '', 2, 'Compu-Ghana Ltd', '2026-05-22', '2.5" SATA III SSD', ''],
 ]
 
 function downloadTemplate() {
@@ -43,47 +42,65 @@ function downloadTemplate() {
 
 /* ─── Parse + validate xlsx ───────────────────────────────────────────── */
 
-function parseFile(file: File, companyId: string): Promise<ImportRow[]> {
+function parseFile(
+  file: File,
+  knownCategories: { value: string; label: string }[],
+): Promise<ImportRow[]> {
+  const categoryValues = new Set(knownCategories.map(c => c.value.toUpperCase()))
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = e => {
       try {
-        const data  = new Uint8Array(e.target!.result as ArrayBuffer)
-        const wb    = XLSX.read(data, { type: 'array' })
-        const ws    = wb.Sheets[wb.SheetNames[0]]
-        const json  = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+        const data = new Uint8Array(e.target!.result as ArrayBuffer)
+        const wb   = XLSX.read(data, { type: 'array' })
+        const ws   = wb.Sheets[wb.SheetNames[0]]
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
 
-        const existingSerials = new Set(INVENTORY.map(i => i.serial?.toLowerCase() ?? ''))
-        const seenInFile      = new Set<string>()
+        const seenInFile = new Set<string>()
 
         const rows: ImportRow[] = json.map((raw, idx) => {
           const get = (key: string) => String(raw[key] ?? '').trim()
           const errors: string[] = []
 
-          const name        = get('Name')
-          const brand       = get('Brand')
-          const model       = get('Model')
-          const serial      = get('Serial Number').toUpperCase()
-          const category    = get('Category')
-          const condition   = get('Condition (NEW/USED/FAULTY)').toUpperCase()
-          const quantity    = parseInt(get('Quantity')) || 1
-          const threshold   = parseInt(get('Low Stock Threshold')) || 5
-          const supplier    = get('Supplier')
+          const name         = get('Name')
+          const brand        = get('Brand')
+          const model        = get('Model')
+          const category     = get('Category').toUpperCase()
+          const condition    = get('Condition (NEW/USED/FAULTY)').toUpperCase()
+          const threshold    = parseInt(get('Low Stock Threshold')) || 5
+          const supplier     = get('Supplier')
           const purchaseDate = get('Purchase Date (YYYY-MM-DD)')
-          const description = get('Description')
-          const notes       = get('Notes')
+          const description  = get('Description')
+          const notes        = get('Notes')
 
-          if (!name)                                    errors.push('Name is required')
-          if (!brand)                                   errors.push('Brand is required')
-          if (!model)                                   errors.push('Model is required')
-          if (!serial)                                  errors.push('Serial is required')
-          if (!category)                                errors.push('Category is required')
-          if (!['NEW','USED','FAULTY'].includes(condition)) errors.push('Condition must be NEW, USED or FAULTY')
-          if (serial && existingSerials.has(serial.toLowerCase()))  errors.push('Serial already in inventory')
-          if (serial && seenInFile.has(serial.toLowerCase()))       errors.push('Duplicate serial in file')
-          if (serial) seenInFile.add(serial.toLowerCase())
+          // Split comma-separated serials, uppercase + dedupe whitespace
+          const serials = get('Serial Number')
+            .split(',')
+            .map(s => s.trim().toUpperCase())
+            .filter(Boolean)
 
-          return { _row: idx + 2, name, brand, model, serial, category, condition, quantity, threshold, supplier, purchaseDate, description, notes, errors }
+          // Quantity is derived from serial count; ignore the Quantity column for serialised items
+          const quantity = serials.length > 0 ? serials.length : (parseInt(get('Quantity')) || 1)
+
+          if (!name)    errors.push('Name is required')
+          if (!brand)   errors.push('Brand is required')
+          if (!model)   errors.push('Model is required')
+          if (serials.length === 0)                             errors.push('At least one serial is required')
+          if (!category)                                        errors.push('Category is required')
+          else if (!categoryValues.has(category))              errors.push(`Unknown category "${category}"`)
+          if (!['NEW', 'USED', 'FAULTY'].includes(condition)) errors.push('Condition must be NEW, USED or FAULTY')
+
+          // Check each serial for duplicates within the file
+          for (const s of serials) {
+            if (seenInFile.has(s.toLowerCase())) {
+              errors.push(`Duplicate serial in file: ${s}`)
+            } else {
+              seenInFile.add(s.toLowerCase())
+            }
+          }
+
+          return { _row: idx + 2, name, brand, model, serials, category, condition, quantity, threshold, supplier, purchaseDate, description, notes, errors }
         })
 
         resolve(rows)
@@ -98,12 +115,23 @@ function parseFile(file: File, companyId: string): Promise<ImportRow[]> {
 /* ─── Import content ──────────────────────────────────────────────────── */
 
 function ImportContent() {
-  const router  = useRouter()
-  const [step, setStep]         = useState<'upload' | 'preview' | 'done'>('upload')
-  const [companyId, setCompanyId] = useState(COMPANIES[0].id)
-  const [filename, setFilename] = useState('')
-  const [rows, setRows]         = useState<ImportRow[]>([])
-  const [importing, setImporting] = useState(false)
+  const router = useRouter()
+
+  const [companies,   setCompanies]   = useState<{ id: string; name: string }[]>([])
+  const [categories,  setCategories]  = useState<{ id: string; value: string; label: string }[]>([])
+  const [companyId,   setCompanyId]   = useState('')
+  const [step,        setStep]        = useState<'upload' | 'preview' | 'done'>('upload')
+  const [filename,    setFilename]    = useState('')
+  const [rows,        setRows]        = useState<ImportRow[]>([])
+  const [importing,   setImporting]   = useState(false)
+
+  useEffect(() => {
+    Promise.all([listCompanies(), listCategories()]).then(([cos, cats]) => {
+      setCompanies(cos)
+      setCategories(cats)
+      if (cos.length > 0) setCompanyId(cos[0].id)
+    })
+  }, [])
 
   const validRows   = rows.filter(r => r.errors.length === 0)
   const invalidRows = rows.length - validRows.length
@@ -111,7 +139,7 @@ function ImportContent() {
   const handleFile = async (file: File) => {
     setFilename(file.name)
     try {
-      const parsed = await parseFile(file, companyId)
+      const parsed = await parseFile(file, categories)
       setRows(parsed)
       setStep('preview')
     } catch (err: unknown) {
@@ -119,16 +147,40 @@ function ImportContent() {
     }
   }
 
-  const handleImport = () => {
-    if (validRows.length === 0) return
+  const handleImport = async () => {
+    if (validRows.length === 0 || !companyId) return
     setImporting(true)
-    setTimeout(() => {
-      toast.success(`${validRows.length} item${validRows.length > 1 ? 's' : ''} imported successfully`, {
+
+    const categoryMap = Object.fromEntries(categories.map(c => [c.value.toUpperCase(), c.id]))
+
+    try {
+      const mapped = validRows.map(row => ({
+        companyId,
+        categoryId:   categoryMap[row.category.toUpperCase()] ?? '',
+        name:         row.name,
+        brand:        row.brand,
+        model:        row.model,
+        isSerialised: true,
+        serials:      row.serials,
+        condition:    row.condition,
+        quantity:     row.serials.length,
+        threshold:    row.threshold,
+        supplier:     row.supplier || undefined,
+        purchaseDate: row.purchaseDate || new Date().toISOString().slice(0, 10),
+        description:  row.description || undefined,
+        notes:        row.notes || undefined,
+      }))
+
+      const result = await importInventoryItems(mapped, filename, companyId)
+      toast.success(`${result.count} item${result.count !== 1 ? 's' : ''} imported successfully`, {
         description: `From file: ${filename}`,
       })
       setStep('done')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Import failed')
+    } finally {
       setImporting(false)
-    }, 1200)
+    }
   }
 
   const breadcrumb = (
@@ -191,8 +243,8 @@ function ImportContent() {
                 background: '#eff6ff', border: '1px solid #bfdbfe',
                 borderRadius: 8, padding: '10px 14px', fontSize: 13,
               }}>
-                <span style={{ fontWeight: 600, color: 'var(--secondary)' }}>Tip — multiple units of the same item:</span>
-                <span className="muted"> add one row per serial number, with the same Name/Brand/Model repeated. The template shows 3 keyboards as an example.</span>
+                <span style={{ fontWeight: 600, color: 'var(--secondary)' }}>Tip — multiple serials for one item:</span>
+                <span className="muted"> put all serial numbers in one cell, separated by commas (e.g. <span className="t-mono">CAM-001, CAM-002, CAM-003</span>). Each row becomes one inventory item. The template shows an example.</span>
               </div>
             </div>
             <div style={{ minWidth: 220 }}>
@@ -204,7 +256,7 @@ function ImportContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-[#E5E7EB] shadow-md">
-                  {COMPANIES.map(c => (
+                  {companies.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>

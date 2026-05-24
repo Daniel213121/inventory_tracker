@@ -5,18 +5,17 @@ import { Input }   from '@/components/ui/input'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { COMPANIES } from '../../lib/data'
-
 interface Props {
   companyId: string
   date:      string
   search:    string
+  companies: { id: string; name: string }[]
   onCompany: (id: string) => void
   onDate:    (v: string)  => void
   onSearch:  (v: string)  => void
 }
 
-export function StockInFilters({ companyId, date, search, onCompany, onDate, onSearch }: Props) {
+export function StockInFilters({ companyId, date, search, companies, onCompany, onDate, onSearch }: Props) {
   return (
     <div className="card" style={{ padding: 24 }}>
       <div className="t-h3" style={{ marginBottom: 16 }}>Return details</div>
@@ -26,7 +25,7 @@ export function StockInFilters({ companyId, date, search, onCompany, onDate, onS
           <Select value={companyId} onValueChange={onCompany}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent className="bg-white border border-[#E5E7EB] shadow-md">
-              {COMPANIES.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              {companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </FormRow>

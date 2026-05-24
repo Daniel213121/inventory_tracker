@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect } from 'react'
+import { logoutUser } from '@/app/actions/auth'
 import { AppSidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { ToastHost } from '../ui/Toast'
@@ -24,6 +25,11 @@ interface AppShellProps {
 export function AppShell({ user, onLogout, children }: AppShellProps) {
   const tweaks = useTweaks(TWEAK_DEFAULTS)
 
+  async function handleLogout() {
+    await logoutUser()
+    onLogout()
+  }
+
   useEffect(() => {
     document.body.setAttribute('data-density', tweaks.density)
   }, [tweaks.density])
@@ -33,9 +39,9 @@ export function AppShell({ user, onLogout, children }: AppShellProps) {
       <TweaksContext.Provider value={tweaks}>
         <SidebarProvider>
           <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)', width: '100%' }}>
-            <AppSidebar onLogout={onLogout} />
+            <AppSidebar onLogout={handleLogout} />
             <SidebarInset className="col" style={{ flex: 1, minWidth: 0 }}>
-              <TopBar user={user} onLogout={onLogout} />
+              <TopBar user={user} onLogout={handleLogout} />
               <main style={{ padding: '28px 32px 64px', flex: 1, minWidth: 0 }}>
                 {children}
               </main>

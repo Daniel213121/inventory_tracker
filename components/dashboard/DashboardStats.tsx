@@ -1,13 +1,12 @@
 import { StatCard } from '../ui/StatCard'
-import { INVENTORY, MOVEMENTS, WAYBILLS } from '../../lib/data'
 
-const totalItems = INVENTORY.reduce((s, i) => s + i.quantity, 0)
+interface DashboardStatsProps {
+  totalItems:   number
+  itemsOut:     number
+  waybillCount: number
+}
 
-const itemsOut =
-  MOVEMENTS.filter(m => m.type === 'OUT').reduce((s, m) => s + m.quantity, 0) -
-  MOVEMENTS.filter(m => m.type === 'IN' && m.condBefore != null).reduce((s, m) => s + m.quantity, 0)
-
-export function DashboardStats() {
+export function DashboardStats({ totalItems, itemsOut, waybillCount }: DashboardStatsProps) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
       <StatCard
@@ -18,13 +17,13 @@ export function DashboardStats() {
       <StatCard
         icon="truck"
         label="Items Currently Out"
-        value={Math.max(0, itemsOut)}
+        value={itemsOut}
         accent="#D97706"
       />
       <StatCard
         icon="document"
         label="Waybills Generated"
-        value={WAYBILLS.length}
+        value={waybillCount}
         accent="#16A34A"
       />
     </div>

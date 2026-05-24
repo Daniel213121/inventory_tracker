@@ -1,51 +1,80 @@
 'use client'
-import { Loading } from '@/components/ui/Loading'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { AppShell } from '../../components/layout/AppShell'
-import { PageHeader } from '../../components/ui/PageHeader'
-import { Icon } from '../../components/icons/Icon'
-import { SearchBar } from '../../components/ui/SearchBar'
-import { CompanyChip } from '../../components/ui/CompanyChip'
+import { useEffect, useState }  from 'react'
+import { useRouter }            from 'next/navigation'
+import { AppShell }             from '../../components/layout/AppShell'
+import { PageHeader }           from '../../components/ui/PageHeader'
+import { Loading }              from '@/components/ui/Loading'
+import { EmptyState }           from '../../components/ui/EmptyState'
+import { Icon }                 from '../../components/icons/Icon'
+import { SearchBar }            from '../../components/ui/SearchBar'
+import { CompanyChip }          from '../../components/ui/CompanyChip'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { WAYBILLS, COMPANIES, fmtDate } from '../../lib/data'
+import { Input }                from '@/components/ui/input'
+import { fmtDate }              from '../../lib/data'
+import { listWaybills }         from '@/app/actions/waybills'
+import { listCompanies }        from '@/app/actions/settings'
 
-const sorted = [...WAYBILLS].sort(
-  (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-)
+type WaybillSummary = {
+  id:          string
+  number:      string
+  companyId:   string
+  companyCode: string
+  companyName: string
+  date:        string
+  suppliedTo:  string
+  lineCount:   number
+  generatedBy: string
+  generatedAt: string
+}
 
 function WaybillsContent() {
   const router = useRouter()
-  const [q, setQ] = useState('')
-  const [company, setCompany] = useState('all')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
 
-  const filtered = useMemo(() => {
-    const ql = q.toLowerCase()
-    return sorted.filter(w => {
-      if (company !== 'all' && w.companyId !== company) return false
-      if (from && w.date < from) return false
-      if (to && w.date > to) return false
-      if (ql && !`${w.number} ${w.suppliedTo}`.toLowerCase().includes(ql)) return false
-      return true
-    })
+  const [q,         setQ]         = useState('')
+  const [company,   setCompany]   = useState('all')
+  const [from,      setFrom]      = useState('')
+  const [to,        setTo]        = useState('')
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
+  const [waybills,  setWaybills]  = useState<WaybillSummary[]>([])
+  const [total,     setTotal]     = useState(0)
+  const [loading,   setLoading]   = useState(true)
+
+  useEffect(() => {
+    listCompanies().then(cos => setCompanies(cos.map(c => ({ id: c.id, name: c.name }))))
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const delay = q ? 300 : 0
+    setLoading(true)
+
+    const timer = setTimeout(async () => {
+      const result = await listWaybills({
+        companyId: company !== 'all' ? company : undefined,
+        search:    q      || undefined,
+        from:      from   || undefined,
+        to:        to     || undefined,
+      })
+      if (!cancelled) {
+        setWaybills(result.waybills as WaybillSummary[])
+        setTotal(result.total)
+        setLoading(false)
+      }
+    }, delay)
+
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [q, company, from, to])
 
   return (
     <div>
       <PageHeader
         title="Waybills"
-        subtitle={`${WAYBILLS.length} waybills issued · auto-incrementing per company per year`}
+        subtitle={loading ? 'Loading…' : `${total} waybill${total !== 1 ? 's' : ''} issued`}
         actions={
           <>
-            <button className="btn btn-secondary btn-sm row gap-2">
-              <Icon name="download" size={15} /> Export
-            </button>
             <button
               className="btn btn-primary btn-sm row gap-2"
               onClick={() => router.push('/movements/stock-out')}
@@ -57,89 +86,87 @@ function WaybillsContent() {
       />
 
       <div className="card" style={{ overflow: 'hidden' }}>
+        {/* Filters */}
         <div className="row" style={{ padding: 16, borderBottom: '1px solid var(--border)', gap: 12, flexWrap: 'wrap' }}>
-          <SearchBar value={q} onChange={setQ} width={320} placeholder="Waybill no. or recipient…" />
+          <SearchBar value={q} onChange={setQ} width={280} placeholder="Waybill no. or recipient…" />
           <div className="row gap-2" style={{ marginLeft: 'auto' }}>
-            <Select value={company} onValueChange={setCompany}>
+            <Select value={company} onValueChange={v => { setCompany(v) }}>
               <SelectTrigger className="w-[160px] bg-[#F3F4F6]">
                 <SelectValue placeholder="All companies" />
               </SelectTrigger>
               <SelectContent className="bg-white border border-[#E5E7EB] shadow-md">
                 <SelectItem value="all">All companies</SelectItem>
-                {COMPANIES.map(c => (
+                {companies.map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Input
-              type="date"
-              value={from}
-              onChange={e => setFrom(e.target.value)}
-              style={{ width: 160 }}
-            />
+            <Input type="date" value={from} onChange={e => setFrom(e.target.value)} style={{ width: 160 }} />
             <span className="muted" style={{ alignSelf: 'center', fontSize: 13 }}>to</span>
-            <Input
-              type="date"
-              value={to}
-              onChange={e => setTo(e.target.value)}
-              style={{ width: 160 }}
-            />
+            <Input type="date" value={to}   onChange={e => setTo(e.target.value)}   style={{ width: 160 }} />
           </div>
         </div>
 
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Waybill No.</th>
-              <th>Company</th>
-              <th>Date</th>
-              <th>Supplied To</th>
-              <th>Items</th>
-              <th>Generated By</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(w => (
-              <tr
-                key={w.id}
-                onClick={() => router.push(`/waybills/${w.id}`)}
-                style={{ cursor: 'pointer' }}
-              >
-                <td>
-                  <span className="t-mono" style={{ fontWeight: 600, color: 'var(--secondary)' }}>
-                    {w.number}
-                  </span>
-                </td>
-                <td><CompanyChip companyId={w.companyId} /></td>
-                <td>
-                  <span className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
-                    {fmtDate(w.date)}
-                  </span>
-                </td>
-                <td style={{ fontSize: 13 }}>{w.suppliedTo}</td>
-                <td style={{ fontSize: 13 }}>{w.itemIds.length} line(s)</td>
-                <td className="muted" style={{ fontSize: 13 }}>{w.generatedBy}</td>
-                <td onClick={e => e.stopPropagation()}>
-                  <div className="row gap-2">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => router.push(`/waybills/${w.id}`)}
-                    >
-                      <Icon name="eye" size={15} />
-                    </button>
-                    <button className="btn btn-ghost btn-sm">
-                      <Icon name="download" size={15} />
-                    </button>
-                    <button className="btn btn-ghost btn-sm">
-                      <Icon name="print" size={15} />
-                    </button>
-                  </div>
-                </td>
+        {/* Table */}
+        {loading ? (
+          <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
+            <Loading />
+          </div>
+        ) : waybills.length === 0 ? (
+          <EmptyState icon="package" title="No waybills found" message="Generate one via Stock Out." />
+        ) : (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Waybill No.</th>
+                <th>Company</th>
+                <th>Date</th>
+                <th>Supplied To</th>
+                <th>Lines</th>
+                <th>Generated By</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {waybills.map(w => (
+                <tr
+                  key={w.id}
+                  onClick={() => router.push(`/waybills/${w.id}`)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td>
+                    <span className="t-mono" style={{ fontWeight: 600, color: 'var(--secondary)' }}>
+                      {w.number}
+                    </span>
+                  </td>
+                  <td><CompanyChip code={w.companyCode} name={w.companyName} /></td>
+                  <td className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{fmtDate(w.date)}</td>
+                  <td style={{ fontSize: 13 }}>{w.suppliedTo}</td>
+                  <td style={{ fontSize: 13 }}>{w.lineCount} line{w.lineCount !== 1 ? 's' : ''}</td>
+                  <td className="muted" style={{ fontSize: 13 }}>{w.generatedBy}</td>
+                  <td onClick={e => e.stopPropagation()}>
+                    <div className="row gap-2">
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => router.push(`/waybills/${w.id}`)}
+                        title="View"
+                      >
+                        <Icon name="eye" size={15} />
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => { router.push(`/waybills/${w.id}`); setTimeout(() => window.print(), 800) }}
+                        title="Print"
+                      >
+                        <Icon name="print" size={15} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

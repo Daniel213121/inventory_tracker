@@ -1,8 +1,7 @@
 import React from 'react'
-import type { Company } from '../../lib/types'
 
 interface LettermarkProps {
-  company: Company
+  company: { id?: string; code: string }
   size?: number
 }
 
@@ -12,7 +11,7 @@ const PALETTE: Record<string, { a: string; b: string }> = {
 }
 
 export function Lettermark({ company, size = 32 }: LettermarkProps) {
-  const { a, b } = PALETTE[company.id] ?? { a: '#1E3A5F', b: '#2563EB' }
+  const { a, b } = PALETTE[company.id ?? ''] ?? { a: '#1E3A5F', b: '#2563EB' }
 
   return (
     <div

@@ -17,6 +17,7 @@ export interface Company {
   authoriserName:        string
   authoriserDesignation: string
   waybillSequence:       number
+  logoUrl:               string | null
 }
 
 export interface Category {
@@ -29,6 +30,17 @@ export interface Category {
 
 export type ConditionValue = 'NEW' | 'USED' | 'FAULTY'
 export type MovementType   = 'IN' | 'OUT'
+export type SerialStatus   = 'IN_STOCK' | 'DISPATCHED'
+
+export interface SerialUnit {
+  id:        string
+  itemId:    string
+  serial:    string
+  condition: ConditionValue
+  status:    SerialStatus
+  createdAt: string
+  updatedAt: string
+}
 
 export interface InventoryItem {
   id:           string
@@ -39,27 +51,33 @@ export interface InventoryItem {
   brand:        string
   model:        string
   isSerialised: boolean
-  serial:       string | null   // primary serial; null for non-serialised items
-  serials:      string[]        // all serials; empty for non-serialised
-  condition:    ConditionValue
-  quantity:     number
+  serialUnits:  SerialUnit[]   // all units (IN_STOCK + DISPATCHED) for serialised items
+  qtyNew:       number         // in-stock counts (derived from serialUnits for serialised)
+  qtyUsed:      number
+  qtyFaulty:    number
+  quantity:     number         // total in stock (computed)
   threshold:    number
   supplier:     string
   purchaseDate: string
   description:  string
   notes:        string
+  imageUrl:     string | null
   updated:      string
 }
 
 export interface Movement {
   id:                 string
   itemId:             string
+  itemName:           string | null
+  itemIsSerialised:   boolean
   companyId:          string
+  companyCode:        string | null
   type:               MovementType
+  waybillNumber:      string | null
   quantity:           number
   serialsDispatched?: string[]
   condBefore:         ConditionValue | null
-  condAfter:          ConditionValue
+  condAfter:          ConditionValue | null
   suppliedTo:         string
   destinationCode:    string | null
   driverName:         string

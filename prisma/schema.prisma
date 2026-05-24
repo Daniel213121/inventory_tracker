@@ -4,10 +4,43 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────
+
+enum AuditAction {
+  // Auth
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGIN_LOCKED
+  LOGOUT
+  SESSION_EXPIRED
+  PASSWORD_CHANGED
+  PASSWORD_RESET_REQUESTED
+
+  // Accounts
+  ACCOUNT_CREATED
+  ACCOUNT_ACTIVATED
+  ACCOUNT_DEACTIVATED
+
+  // Inventory
+  INVENTORY_CREATED
+  INVENTORY_UPDATED
+  INVENTORY_DELETED
+  INVENTORY_IMPORTED
+
+  // Movements
+  MOVEMENT_STOCK_IN
+  MOVEMENT_STOCK_OUT
+
+  // Waybills
+  WAYBILL_CREATED
+  WAYBILL_PRINTED
+
+  // Settings & profile
+  SETTINGS_UPDATED
+  PROFILE_UPDATED
+}
 
 enum Condition {
   NEW
@@ -18,6 +51,11 @@ enum Condition {
 enum MovementType {
   IN
   OUT
+}
+
+enum SerialStatus {
+  IN_STOCK
+  DISPATCHED
 }
 
 // ─── Company ──────────────────────────────────────────────────────────────
@@ -40,6 +78,7 @@ model Company {
   authoriserName        String
   authoriserDesignation String
   waybillSequence       Int             @default(0)
+  logoUrl               String?
 
   inventory             InventoryItem[]
   movements             Movement[]
@@ -76,15 +115,21 @@ model InventoryItem {
   brand         String
   model         String
   isSerialised  Boolean       @default(true)
-  serial        String?       @unique
-  serials       String[]
-  condition     Condition
-  quantity      Int           @default(1)
+
+  // Non-serialised: condition tracked by qty buckets
+  qtyNew        Int           @default(0)
+  qtyUsed       Int           @default(0)
+  qtyFaulty     Int           @default(0)
+
+  // Serialised: condition tracked per SerialUnit
+  serialUnits   SerialUnit[]
+
   threshold     Int           @default(5)
   supplier      String?
   purchaseDate  DateTime
   description   String?
   notes         String?
+  imageUrl      String?
 
   importBatchId String?
   importBatch   ImportBatch?  @relation(fields: [importBatchId], references: [id])
@@ -96,7 +141,23 @@ model InventoryItem {
 
   @@index([companyId])
   @@index([categoryId])
-  @@index([condition])
+}
+
+// ─── Serial Unit ──────────────────────────────────────────────────────────
+
+model SerialUnit {
+  id        String        @id @default(cuid())
+  itemId    String
+  item      InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  serial    String
+  condition Condition
+  status    SerialStatus  @default(IN_STOCK)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([itemId, serial])
+  @@index([itemId])
+  @@index([status])
 }
 
 // ─── Movement ─────────────────────────────────────────────────────────────
@@ -114,7 +175,7 @@ model Movement {
   quantity          Int
   serialsDispatched String[]
   condBefore        Condition?
-  condAfter         Condition
+  condAfter         Condition?
 
   suppliedTo        String
   destinationCode   String?
@@ -176,13 +237,38 @@ model ImportBatch {
 // ─── User ─────────────────────────────────────────────────────────────────
 
 model User {
-  id        String    @id @default(cuid())
-  name      String
-  email     String    @unique
-  password  String
-  active    Boolean   @default(true)
-  lastLogin DateTime?
+  id               String    @id @default(cuid())
+  name             String
+  email            String    @unique
+  password         String
+  active           Boolean   @default(true)
+  lastLogin        DateTime?
+  sessionToken     String?   @unique
+  sessionExpiresAt DateTime?
+  failedAttempts   Int       @default(0)
+  lockedUntil      DateTime?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  action       AuditAction
+  email        String
+  userId       String?
+  resourceType String?     // "User" | "InventoryItem" | "Movement" | "Waybill" | "Company"
+  resourceId   String?
+  ipAddress    String?
+  userAgent    String?
+  metadata     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
 }

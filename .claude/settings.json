@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(set PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=yes, proceed)",
+      "PowerShell($env:PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes, proceed\"; cd \"c:\\\\Users\\\\danie\\\\OneDrive\\\\Desktop\\\\apps\\\\inventory_tracker\"; npx prisma db push --force-reset 2>&1)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

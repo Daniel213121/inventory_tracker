@@ -1,18 +1,19 @@
 import { Lettermark } from '../ui/Lettermark'
 import { Icon } from '../icons/Icon'
-import { COMPANIES } from '../../lib/data'
+import type { Company } from '../../lib/types'
 
 interface SettingsNavProps {
-  active: string
-  onSelect: (id: string) => void
+  companies: Company[]
+  active:    string
+  onSelect:  (id: string) => void
 }
 
-export function SettingsNav({ active, onSelect }: SettingsNavProps) {
+export function SettingsNav({ companies, active, onSelect }: SettingsNavProps) {
   return (
     <div className="col gap-2">
       <span className="t-label" style={{ marginBottom: 4, paddingLeft: 12 }}>Companies</span>
 
-      {COMPANIES.map(c => (
+      {companies.map(c => (
         <button
           key={c.id}
           onClick={() => onSelect(c.id)}
@@ -20,9 +21,9 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
           style={{
             borderRadius: 8,
             padding: 12,
-            border: active === c.id ? '1px solid var(--border)' : '1px solid transparent',
+            border:     active === c.id ? '1px solid var(--border)' : '1px solid transparent',
             background: active === c.id ? '#fff' : 'transparent',
-            boxShadow: active === c.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+            boxShadow:  active === c.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
             textAlign: 'left',
             width: '100%',
             cursor: 'pointer',
@@ -41,9 +42,9 @@ export function SettingsNav({ active, onSelect }: SettingsNavProps) {
       <span className="t-label" style={{ marginTop: 16, marginBottom: 4, paddingLeft: 12 }}>System</span>
 
       {[
-        { icon: 'bell', label: 'Notifications' },
-        { icon: 'key',  label: 'Security & access' },
-        { icon: 'document', label: 'Waybill templates' },
+        { icon: 'bell',     label: 'Notifications'      },
+        { icon: 'key',      label: 'Security & access'  },
+        { icon: 'document', label: 'Waybill templates'  },
       ].map(item => (
         <button
           key={item.label}

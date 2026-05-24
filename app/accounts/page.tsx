@@ -1,26 +1,32 @@
 'use client'
-import { Loading } from '@/components/ui/Loading'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { toast } from 'sonner'
-import { AppShell }   from '../../components/layout/AppShell'
-import { PageHeader } from '../../components/ui/PageHeader'
-import { StatCard }   from '../../components/ui/StatCard'
-import { FormRow }    from '../../components/ui/FormRow'
-import { Icon }       from '../../components/icons/Icon'
-import { StatusBadge } from '../../components/ui/badges'
-import { Input }      from '@/components/ui/input'
-import { Button }     from '@/components/ui/button'
+import { useEffect, useState }  from 'react'
+import { useRouter }            from 'next/navigation'
+import { useForm }              from 'react-hook-form'
+import { zodResolver }          from '@hookform/resolvers/zod'
+import { z }                    from 'zod'
+import { toast }                from 'sonner'
+import { AppShell }             from '../../components/layout/AppShell'
+import { PageHeader }           from '../../components/ui/PageHeader'
+import { StatCard }             from '../../components/ui/StatCard'
+import { FormRow }              from '../../components/ui/FormRow'
+import { Icon }                 from '../../components/icons/Icon'
+import { StatusBadge }          from '../../components/ui/badges'
+import { Loading }              from '@/components/ui/Loading'
+import { Input }                from '@/components/ui/input'
+import { Button }               from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { USERS, fmtDate } from '../../lib/data'
-import type { User } from '../../lib/types'
+import { fmtDate }              from '../../lib/data'
+import {
+  listUsers,
+  createAccount,
+  setAccountActive,
+  requestPasswordReset,
+}                               from '@/app/actions/accounts'
+import type { User }            from '../../lib/types'
 
 /* ─── Schema ─────────────────────────────────────────────────────────────── */
 
@@ -39,6 +45,20 @@ type CreateFields = z.infer<typeof createSchema>
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
+function serializeUser(u: {
+  id: string; name: string; email: string; active: boolean
+  createdAt: Date | string; lastLogin: Date | string | null
+}): User {
+  return {
+    id:        u.id,
+    name:      u.name,
+    email:     u.email,
+    active:    u.active,
+    createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : u.createdAt,
+    lastLogin: u.lastLogin instanceof Date ? u.lastLogin.toISOString() : u.lastLogin,
+  }
+}
+
 function initials(name: string) {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
@@ -53,19 +73,23 @@ function avatarColor(name: string) {
 /* ─── Main content ───────────────────────────────────────────────────────── */
 
 function AccountsContent({ currentUser }: { currentUser: { id: string; name: string; email: string } }) {
-  const [users, setUsers]         = useState<User[]>(USERS)
-  const [open, setOpen]           = useState(false)
+  const [users,   setUsers]   = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [open,    setOpen]    = useState(false)
   const [resetUser, setResetUser] = useState<User | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const active   = users.filter(u => u.active)
   const inactive = users.filter(u => !u.active)
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<CreateFields>({
+  // Load users from DB on mount
+  useEffect(() => {
+    listUsers()
+      .then(rows => setUsers(rows.map(serializeUser)))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateFields>({
     resolver: zodResolver(createSchema),
     defaultValues: { name: '', email: '', password: '', confirm: '' },
   })
@@ -75,48 +99,74 @@ function AccountsContent({ currentUser }: { currentUser: { id: string; name: str
     if (!v) reset()
   }
 
-  function create(data: CreateFields) {
-    const newUser: User = {
-      id:        `u${Date.now()}`,
-      name:      data.name.trim(),
-      email:     data.email.trim(),
-      active:    true,
-      createdAt: new Date().toISOString().slice(0, 10),
-      lastLogin: null,
+  async function create(data: CreateFields) {
+    setSubmitting(true)
+    try {
+      const newUser = await createAccount({
+        name:     data.name.trim(),
+        email:    data.email.trim(),
+        password: data.password,
+      })
+      setUsers(prev => [...prev, serializeUser(newUser)])
+      handleOpenChange(false)
+      toast.success(`Account created for ${newUser.name}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create account')
+    } finally {
+      setSubmitting(false)
     }
-    setUsers(prev => [...prev, newUser])
-    handleOpenChange(false)
-    toast.success(`Account created for ${newUser.name}`)
   }
 
-  function toggleActive(id: string) {
-    setUsers(prev => prev.map(u => {
-      if (u.id !== id) return u
-      const next = { ...u, active: !u.active }
-      toast.success(`${u.name} is now ${next.active ? 'active' : 'deactivated'}`)
-      return next
-    }))
+  async function toggleActive(user: User) {
+    const next = !user.active
+    // Optimistic update
+    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, active: next } : u))
+    try {
+      await setAccountActive(user.id, next)
+      toast.success(`${user.name} is now ${next ? 'active' : 'deactivated'}`)
+    } catch (err) {
+      // Revert on failure
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, active: user.active } : u))
+      toast.error(err instanceof Error ? err.message : 'Failed to update account')
+    }
+  }
+
+  async function sendReset(user: User) {
+    try {
+      await requestPasswordReset(user.id)
+      toast.success(`Reset link sent to ${user.email}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to request reset')
+    } finally {
+      setResetUser(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
+        <Loading />
+      </div>
+    )
   }
 
   return (
     <div>
       <PageHeader
         title="Accounts"
-        subtitle={`${users.length} accounts — all have full read & write access to inventory, movements, and waybills.`}
+        subtitle={`${users.length} account${users.length !== 1 ? 's' : ''} — all have full read & write access to inventory, movements, and waybills.`}
         actions={
-          <>
-            <button className="btn btn-primary btn-sm row gap-2" onClick={() => setOpen(true)}>
-              <Icon name="plus" size={15} /> Create account
-            </button>
-          </>
+          <button className="btn btn-primary btn-sm row gap-2" onClick={() => setOpen(true)}>
+            <Icon name="plus" size={15} /> Create account
+          </button>
         }
       />
 
       {/* Stat strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
-        <StatCard icon="users"  label="Active users"  value={active.length}   accent="#16A34A" />
-        <StatCard icon="user"   label="Inactive"      value={inactive.length} accent="#6B7280" />
-        <StatCard icon="key"    label="Logins today"  value={4}               accent="#2563EB" />
+        <StatCard icon="users" label="Active users"  value={active.length}   accent="#16A34A" />
+        <StatCard icon="user"  label="Inactive"      value={inactive.length} accent="#6B7280" />
+        <StatCard icon="key"   label="Total accounts" value={users.length}   accent="#2563EB" />
       </div>
 
       {/* Table */}
@@ -134,17 +184,14 @@ function AccountsContent({ currentUser }: { currentUser: { id: string; name: str
           </thead>
           <tbody>
             {users.map(u => {
-              const isYou = u.email === currentUser.email || u.name === currentUser.name
+              const isYou = u.email === currentUser.email
               const color = avatarColor(u.name)
               return (
                 <tr key={u.id}>
                   <td>
                     <div className="row gap-3" style={{ alignItems: 'center' }}>
                       <Avatar style={{ width: 32, height: 32, flexShrink: 0 }}>
-                        <AvatarFallback style={{
-                          background: color, color: '#fff',
-                          fontSize: 11, fontWeight: 700,
-                        }}>
+                        <AvatarFallback style={{ background: color, color: '#fff', fontSize: 11, fontWeight: 700 }}>
                           {initials(u.name)}
                         </AvatarFallback>
                       </Avatar>
@@ -170,12 +217,14 @@ function AccountsContent({ currentUser }: { currentUser: { id: string; name: str
                       <button
                         className="btn btn-secondary btn-sm"
                         onClick={() => setResetUser(u)}
+                        disabled={isYou}
                       >
                         Reset password
                       </button>
                       <button
                         className={`btn btn-sm ${u.active ? 'btn-danger' : 'btn-primary'}`}
-                        onClick={() => toggleActive(u.id)}
+                        onClick={() => toggleActive(u)}
+                        disabled={isYou}
                       >
                         {u.active ? 'Deactivate' : 'Activate'}
                       </button>
@@ -188,7 +237,7 @@ function AccountsContent({ currentUser }: { currentUser: { id: string; name: str
         </table>
       </div>
 
-      {/* ── Create modal ─────────────────────────────────────────────────── */}
+      {/* ── Create account modal ──────────────────────────────────────────── */}
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent style={{ maxWidth: 480, background: '#fff', borderRadius: 12 }} showCloseButton aria-describedby={undefined}>
           <DialogHeader>
@@ -221,14 +270,18 @@ function AccountsContent({ currentUser }: { currentUser: { id: string; name: str
             </div>
 
             <DialogFooter style={{ marginTop: 20 }}>
-              <button type="button" className="btn btn-secondary" onClick={() => handleOpenChange(false)}>Cancel</button>
-              <Button type="submit">Create account</Button>
+              <button type="button" className="btn btn-secondary" onClick={() => handleOpenChange(false)}>
+                Cancel
+              </button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Creating…' : 'Create account'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* ── Reset password modal ─────────────────────────────────────────── */}
+      {/* ── Reset password modal ──────────────────────────────────────────── */}
       <Dialog open={!!resetUser} onOpenChange={v => { if (!v) setResetUser(null) }}>
         <DialogContent style={{ maxWidth: 420, background: '#fff', borderRadius: 12 }} showCloseButton aria-describedby={undefined}>
           <DialogHeader>
@@ -246,10 +299,7 @@ function AccountsContent({ currentUser }: { currentUser: { id: string; name: str
 
           <DialogFooter>
             <button className="btn btn-secondary" onClick={() => setResetUser(null)}>Cancel</button>
-            <Button onClick={() => {
-              toast.success(`Reset link sent to ${resetUser?.email}`)
-              setResetUser(null)
-            }}>
+            <Button onClick={() => resetUser && sendReset(resetUser)}>
               Send reset email
             </Button>
           </DialogFooter>
@@ -268,8 +318,7 @@ export default function AccountsPage() {
   useEffect(() => {
     const stored = localStorage.getItem('auth_user')
     if (!stored) { router.push('/login'); return }
-    const parsed = JSON.parse(stored)
-    setUser(parsed)
+    setUser(JSON.parse(stored))
   }, [router])
 
   if (!user) return <Loading />

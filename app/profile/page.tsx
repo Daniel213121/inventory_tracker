@@ -15,8 +15,8 @@ import { StatusBadge } from '../../components/ui/badges'
 import { Input }       from '@/components/ui/input'
 import { Button }      from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { USERS, fmtDate } from '../../lib/data'
-import type { User } from '../../lib/types'
+import { fmtDate }     from '../../lib/data'
+import { logoutUser, getMyProfile, updateMyProfile, changeMyPassword } from '../actions/auth'
 
 function initials(name: string) {
   return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
@@ -44,13 +44,17 @@ type PasswordFields = z.infer<typeof passwordSchema>
 
 /* ─── Profile content ───────────────────────────────────────────────────── */
 
-function ProfileContent({ authUser }: { authUser: { id: string; name: string; email: string } }) {
-  const router = useRouter()
+type ProfileUser = {
+  id:        string
+  name:      string
+  email:     string
+  active:    boolean
+  createdAt: Date
+  lastLogin: Date | null
+}
 
-  const found = USERS.find(u => u.email === authUser.email) ?? null
-  const [user, setUser] = useState<User>(
-    found ?? { id: authUser.id, name: authUser.name, email: authUser.email, active: true, createdAt: '', lastLogin: null }
-  )
+function ProfileContent({ profile }: { profile: ProfileUser }) {
+  const router = useRouter()
 
   /* ── Profile form ─────────────────────────────────────────────────────── */
   const {
@@ -59,12 +63,16 @@ function ProfileContent({ authUser }: { authUser: { id: string; name: string; em
     formState: { errors: profileErrors, isDirty: profileDirty },
   } = useForm<ProfileFields>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { name: user.name, email: user.email },
+    defaultValues: { name: profile.name, email: profile.email },
   })
 
-  function saveProfile(data: ProfileFields) {
-    setUser(prev => ({ ...prev, name: data.name, email: data.email }))
-    toast.success('Profile updated')
+  async function saveProfile(data: ProfileFields) {
+    try {
+      await updateMyProfile(data)
+      toast.success('Profile updated')
+    } catch {
+      toast.error('Failed to update profile')
+    }
   }
 
   /* ── Password form ────────────────────────────────────────────────────── */
@@ -78,9 +86,14 @@ function ProfileContent({ authUser }: { authUser: { id: string; name: string; em
     defaultValues: { currentPw: '', newPw: '', confirmPw: '' },
   })
 
-  function savePassword(_data: PasswordFields) {
-    resetPassword()
-    toast.success('Password changed successfully')
+  async function savePassword(data: PasswordFields) {
+    try {
+      await changeMyPassword({ currentPw: data.currentPw, newPw: data.newPw })
+      resetPassword()
+      toast.success('Password changed successfully')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to change password')
+    }
   }
 
   return (
@@ -101,24 +114,26 @@ function ProfileContent({ authUser }: { authUser: { id: string; name: string; em
                   background: 'linear-gradient(135deg, #2563EB, #1E3A5F)',
                   color: '#fff', fontWeight: 700, fontSize: 22,
                 }}>
-                  {initials(user.name)}
+                  {initials(profile.name)}
                 </AvatarFallback>
               </Avatar>
             </div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{user.name}</div>
-            <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>{user.email}</div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{profile.name}</div>
+            <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>{profile.email}</div>
             <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <StatusBadge active={user.active} />
+              <StatusBadge active={profile.active} />
             </div>
             <div style={{ borderTop: '1px solid var(--border)', margin: '20px 0 16px' }} />
             <div className="col gap-3" style={{ textAlign: 'left' }}>
               <div>
                 <div className="t-label" style={{ fontSize: 11, marginBottom: 2 }}>Member since</div>
-                <div style={{ fontSize: 13 }}>{user.createdAt ? fmtDate(user.createdAt) : '—'}</div>
+                <div style={{ fontSize: 13 }}>{fmtDate(profile.createdAt.toISOString())}</div>
               </div>
               <div>
                 <div className="t-label" style={{ fontSize: 11, marginBottom: 2 }}>Last login</div>
-                <div style={{ fontSize: 13 }}>{user.lastLogin ? fmtDate(user.lastLogin) : '—'}</div>
+                <div style={{ fontSize: 13 }}>
+                  {profile.lastLogin ? fmtDate(profile.lastLogin.toISOString()) : '—'}
+                </div>
               </div>
             </div>
           </div>
@@ -126,7 +141,11 @@ function ProfileContent({ authUser }: { authUser: { id: string; name: string; em
           <button
             className="btn btn-secondary row gap-2"
             style={{ width: '100%', justifyContent: 'center', color: 'var(--error)', borderColor: '#fecaca' }}
-            onClick={() => { localStorage.removeItem('auth_user'); router.push('/login') }}
+            onClick={async () => {
+              await logoutUser()
+              localStorage.removeItem('auth_user')
+              router.push('/login')
+            }}
           >
             <Icon name="logout" size={15} stroke="var(--error)" />
             Sign out
@@ -186,20 +205,22 @@ function ProfileContent({ authUser }: { authUser: { id: string; name: string; em
 /* ─── Page wrapper ───────────────────────────────────────────────────────── */
 
 export default function ProfilePage() {
-  const router = useRouter()
-  const [user, setUser] = useState<{ id: string; name: string; email: string } | null>(null)
+  const router  = useRouter()
+  const [user,    setUser]    = useState<{ id: string; name: string; email: string } | null>(null)
+  const [profile, setProfile] = useState<ProfileUser | null>(null)
 
   useEffect(() => {
     const stored = localStorage.getItem('auth_user')
     if (!stored) { router.push('/login'); return }
     setUser(JSON.parse(stored))
+    getMyProfile().then(p => { if (p) setProfile(p) })
   }, [router])
 
-  if (!user) return <Loading />
+  if (!user || !profile) return <Loading />
 
   return (
     <AppShell user={user} onLogout={() => { localStorage.removeItem('auth_user'); router.push('/login') }}>
-      <ProfileContent authUser={user} />
+      <ProfileContent profile={profile} />
     </AppShell>
   )
 }

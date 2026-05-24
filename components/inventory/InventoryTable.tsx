@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation'
 import { ConditionBadge } from '../ui/badges'
-import { CompanyChip }    from '../ui/CompanyChip'
 import { EmptyState }     from '../ui/EmptyState'
 import { Icon }           from '../icons/Icon'
 import { Button }         from '@/components/ui/button'
@@ -31,13 +30,11 @@ export function InventoryTable({ items }: Props) {
       <table className="tbl">
         <thead>
           <tr>
-            <th>Serial No.</th>
             <th>Name</th>
             <th>Category</th>
             <th>Brand / Model</th>
             <th>Condition</th>
             <th style={{ textAlign: 'right' }}>Qty</th>
-            <th>Company</th>
             <th>Last Updated</th>
             <th />
           </tr>
@@ -49,9 +46,6 @@ export function InventoryTable({ items }: Props) {
               onClick={() => router.push(`/inventory/${item.id}`)}
               style={{ cursor: 'pointer' }}
             >
-              {/* Serial */}
-              <td className="t-mono" style={{ fontSize: 13 }}>{item.serial ?? <span className="muted">—</span>}</td>
-
               {/* Name + supplier */}
               <td>
                 <div style={{ fontWeight: 500, fontSize: 14 }}>{item.name}</div>
@@ -81,23 +75,24 @@ export function InventoryTable({ items }: Props) {
               </td>
 
               {/* Condition */}
-              <td><ConditionBadge value={item.condition} /></td>
-
-              {/* Qty */}
-              <td style={{ textAlign: 'right' }}>
-                <span style={{ fontWeight: 600, fontSize: 15 }}>{item.quantity}</span>
-                {item.quantity < item.threshold && (
-                  <Icon
-                    name="alert"
-                    size={14}
-                    stroke="#DC2626"
-                    style={{ marginLeft: 6, verticalAlign: 'middle' }}
-                  />
-                )}
+              <td>
+                <div className="row gap-1" style={{ flexWrap: 'wrap' }}>
+                  {item.qtyNew    > 0 && <ConditionBadge value="NEW" />}
+                  {item.qtyUsed   > 0 && <ConditionBadge value="USED" />}
+                  {item.qtyFaulty > 0 && <ConditionBadge value="FAULTY" />}
+                  {item.quantity  === 0 && <span className="muted" style={{ fontSize: 12 }}>—</span>}
+                </div>
               </td>
 
-              {/* Company */}
-              <td><CompanyChip companyId={item.companyId} /></td>
+              {/* Qty */}
+              <td>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                  <span style={{ fontWeight: 600, fontSize: 15 }}>{item.quantity}</span>
+                  {item.quantity < item.threshold && (
+                    <Icon name="alert" size={14} stroke="#DC2626" />
+                  )}
+                </div>
+              </td>
 
               {/* Updated */}
               <td className="muted" style={{ fontSize: 13 }}>{fmtDate(item.updated)}</td>

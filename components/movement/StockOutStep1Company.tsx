@@ -1,12 +1,16 @@
 import { Lettermark } from '../ui/Lettermark'
-import { COMPANIES }  from '../../lib/data'
+
+interface CompanyOption {
+  id: string; name: string; code: string; tagline: string
+}
 
 interface Props {
   companyId: string
+  companies: CompanyOption[]
   onSelect:  (id: string) => void
 }
 
-export function StockOutStep1Company({ companyId, onSelect }: Props) {
+export function StockOutStep1Company({ companyId, companies, onSelect }: Props) {
   return (
     <div className="card" style={{ padding: 24 }}>
       <div className="t-h3" style={{ marginBottom: 8 }}>Which company are you dispatching from?</div>
@@ -15,7 +19,7 @@ export function StockOutStep1Company({ companyId, onSelect }: Props) {
       </p>
 
       <div className="row gap-3">
-        {COMPANIES.map(c => {
+        {companies.map(c => {
           const selected = companyId === c.id
           return (
             <button

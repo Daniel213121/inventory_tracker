@@ -8,21 +8,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CATEGORIES, CONDITIONS } from '../../lib/data'
-import { COMPANIES } from '../../lib/data'
+import { CONDITIONS } from '../../lib/data'
 
 interface Props {
-  q: string
-  company: string
-  cat: string
-  cond: string
-  onQ: (v: string) => void
-  onCompany: (v: string) => void
-  onCat: (v: string) => void
-  onCond: (v: string) => void
+  q:          string
+  company:    string
+  cat:        string
+  cond:       string
+  onQ:        (v: string) => void
+  onCompany:  (v: string) => void
+  onCat:      (v: string) => void
+  onCond:     (v: string) => void
+  companies:  { id: string; name: string }[]
+  categories: { id: string; label: string }[]
 }
 
-export function InventoryFilters({ q, company, cat, cond, onQ, onCompany, onCat, onCond }: Props) {
+export function InventoryFilters({
+  q, company, cat, cond,
+  onQ, onCompany, onCat, onCond,
+  companies, categories,
+}: Props) {
   return (
     <div
       className="row"
@@ -47,7 +52,7 @@ export function InventoryFilters({ q, company, cat, cond, onQ, onCompany, onCat,
           </SelectTrigger>
           <SelectContent className="bg-white border border-[#E5E7EB] shadow-md">
             <SelectItem value="all">All companies</SelectItem>
-            {COMPANIES.map(c => (
+            {companies.map(c => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
           </SelectContent>
@@ -59,7 +64,7 @@ export function InventoryFilters({ q, company, cat, cond, onQ, onCompany, onCat,
           </SelectTrigger>
           <SelectContent className="bg-white border border-[#E5E7EB] shadow-md">
             <SelectItem value="all">All categories</SelectItem>
-            {CATEGORIES.map(c => (
+            {categories.map(c => (
               <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
             ))}
           </SelectContent>

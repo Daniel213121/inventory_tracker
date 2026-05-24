@@ -9,7 +9,7 @@ export interface ImportRow {
   name:        string
   brand:       string
   model:       string
-  serial:      string
+  serials:     string[]
   category:    string
   condition:   string
   quantity:    number
@@ -74,7 +74,17 @@ export function ImportPreview({ rows }: Props) {
                     <div style={{ fontSize: 13 }}>{row.brand}</div>
                     <div className="muted" style={{ fontSize: 12 }}>{row.model}</div>
                   </td>
-                  <td className="t-mono" style={{ fontSize: 12 }}>{row.serial}</td>
+                  <td style={{ fontSize: 12 }}>
+                    {row.serials.length === 0
+                      ? <span className="muted">—</span>
+                      : <>
+                          <span className="t-mono">{row.serials[0]}</span>
+                          {row.serials.length > 1 && (
+                            <span className="muted" style={{ marginLeft: 4 }}>+{row.serials.length - 1} more</span>
+                          )}
+                        </>
+                    }
+                  </td>
                   <td style={{ fontSize: 13 }}>{row.category}</td>
                   <td>
                     {CONDITIONS.has(row.condition?.toUpperCase())
