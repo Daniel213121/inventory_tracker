@@ -58,8 +58,10 @@ export async function getDashboardData(): Promise<DashboardData> {
     prisma.category.findMany({ orderBy: { label: 'asc' } }),
   ])
 
-  type InvRow = typeof inventoryItems[number]
-  type MovRow = typeof allMovements[number]
+  type InvRow  = typeof inventoryItems[number]
+  type MovRow  = typeof allMovements[number]
+  type CompRow = typeof companies[number]
+  type CatRow  = typeof categories[number]
 
   // Compute currently dispatched items (last movement per item is OUT)
   const byItem = new Map<string, MovRow>()
@@ -105,8 +107,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     itemsOut,
     waybillCount,
     recentMovements,
-    companies: companies.map(c => ({ id: c.id, name: c.name, code: c.code })),
-    categories: categories.map(c => ({ id: c.id, label: c.label })),
+    companies: companies.map((c: CompRow) => ({ id: c.id, name: c.name, code: c.code })),
+    categories: categories.map((c: CatRow) => ({ id: c.id, label: c.label })),
     inventory,
   }
 }
