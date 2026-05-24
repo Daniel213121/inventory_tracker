@@ -58,15 +58,18 @@ export async function getDashboardData(): Promise<DashboardData> {
     prisma.category.findMany({ orderBy: { label: 'asc' } }),
   ])
 
+  type InvRow = typeof inventoryItems[number]
+  type MovRow = typeof allMovements[number]
+
   // Compute currently dispatched items (last movement per item is OUT)
-  const byItem = new Map<string, typeof allMovements[0]>()
+  const byItem = new Map<string, MovRow>()
   for (const m of allMovements) {
     if (m.type === 'OUT' && m.waybillId) byItem.set(m.itemId, m)
     else if (m.type === 'IN')            byItem.delete(m.itemId)
   }
-  const itemsOut = [...byItem.values()].reduce((s, m) => s + m.quantity, 0)
+  const itemsOut = [...byItem.values()].reduce((s: number, m: MovRow) => s + m.quantity, 0)
 
-  const totalItems = inventoryItems.reduce((s: number, item: typeof inventoryItems[number]) => {
+  const totalItems = inventoryItems.reduce((s: number, item: InvRow) => {
     const qty = item.isSerialised
       ? item._count.serialUnits
       : item.qtyNew + item.qtyUsed + item.qtyFaulty
@@ -74,9 +77,9 @@ export async function getDashboardData(): Promise<DashboardData> {
   }, 0)
 
   const recentMovements = [...allMovements]
-    .sort((a, b) => b.movedAt.getTime() - a.movedAt.getTime())
+    .sort((a: MovRow, b: MovRow) => b.movedAt.getTime() - a.movedAt.getTime())
     .slice(0, 10)
-    .map(m => ({
+    .map((m: MovRow) => ({
       id:          m.id,
       itemId:      m.itemId,
       itemName:    m.item.name,
@@ -89,7 +92,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       movedAt:     m.movedAt.toISOString(),
     }))
 
-  const inventory: DashboardInventorySummary[] = inventoryItems.map(item => ({
+  const inventory: DashboardInventorySummary[] = inventoryItems.map((item: InvRow) => ({
     companyId:  item.companyId,
     categoryId: item.categoryId,
     quantity:   item.isSerialised
