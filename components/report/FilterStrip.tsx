@@ -62,7 +62,7 @@ export function FilterStrip({
           style={{ marginLeft: 'auto' }}
           onClick={onRefresh}
         >
-          <Icon name="refresh-cw" size={14} /> Refresh
+          <Icon name="refresh" size={14} /> Refresh
         </button>
       </div>
     </div>

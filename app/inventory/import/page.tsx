@@ -53,7 +53,7 @@ function parseFile(file: File, companyId: string): Promise<ImportRow[]> {
         const ws    = wb.Sheets[wb.SheetNames[0]]
         const json  = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
 
-        const existingSerials = new Set(INVENTORY.map(i => i.serial.toLowerCase()))
+        const existingSerials = new Set(INVENTORY.map(i => i.serial?.toLowerCase() ?? ''))
         const seenInFile      = new Set<string>()
 
         const rows: ImportRow[] = json.map((raw, idx) => {

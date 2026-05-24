@@ -7,12 +7,12 @@ const chartData = CATEGORIES.map(cat => ({
   series: [
     {
       name: 'VSA', color: '#1E3A5F',
-      value: INVENTORY.filter(i => i.companyId === 'vsa' && i.category === cat.value)
+      value: INVENTORY.filter(i => i.companyId === 'vsa' && i.category.value === cat.value)
         .reduce((s, i) => s + i.quantity, 0),
     },
     {
       name: 'VIA', color: '#2563EB',
-      value: INVENTORY.filter(i => i.companyId === 'via' && i.category === cat.value)
+      value: INVENTORY.filter(i => i.companyId === 'via' && i.category.value === cat.value)
         .reduce((s, i) => s + i.quantity, 0),
     },
   ],

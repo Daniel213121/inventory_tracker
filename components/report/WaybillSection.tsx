@@ -51,7 +51,7 @@ export function WaybillSection() {
                   className="btn btn-ghost btn-sm row gap-2"
                   onClick={() => router.push(`/waybills/${w.id}`)}
                 >
-                  <Icon name="printer" size={14} /> Reprint
+                  <Icon name="print" size={14} /> Reprint
                 </button>
               </td>
             </tr>
