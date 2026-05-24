@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────
+
+enum Condition {
+  NEW
+  USED
+  FAULTY
+}
+
+enum MovementType {
+  IN
+  OUT
+}
+
+// ─── Company ──────────────────────────────────────────────────────────────
+
+model Company {
+  id                    String          @id @default(cuid())
+  name                  String
+  code                  String          @unique
+  tagline               String
+  taglineLine2          String
+  fullName              String
+  addressGhana          String
+  addressUSA            String
+  phoneGhana            String
+  mobileGhana           String
+  phoneUSA              String
+  email                 String
+  website               String
+  brandSubtitle         String
+  authoriserName        String
+  authoriserDesignation String
+  waybillSequence       Int             @default(0)
+
+  inventory             InventoryItem[]
+  movements             Movement[]
+  waybills              Waybill[]
+
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+}
+
+// ─── Category ─────────────────────────────────────────────────────────────
+
+model Category {
+  id        String          @id @default(cuid())
+  value     String          @unique
+  label     String
+  isDefault Boolean         @default(false)
+
+  inventory InventoryItem[]
+
+  createdAt DateTime        @default(now())
+}
+
+// ─── Inventory Item ────────────────────────────────────────────────────────
+
+model InventoryItem {
+  id            String        @id @default(cuid())
+  companyId     String
+  company       Company       @relation(fields: [companyId], references: [id])
+
+  categoryId    String
+  category      Category      @relation(fields: [categoryId], references: [id])
+
+  name          String
+  brand         String
+  model         String
+  isSerialised  Boolean       @default(true)
+  serial        String?       @unique
+  serials       String[]
+  condition     Condition
+  quantity      Int           @default(1)
+  threshold     Int           @default(5)
+  supplier      String?
+  purchaseDate  DateTime
+  description   String?
+  notes         String?
+
+  importBatchId String?
+  importBatch   ImportBatch?  @relation(fields: [importBatchId], references: [id])
+
+  movements     Movement[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([condition])
+}
+
+// ─── Movement ─────────────────────────────────────────────────────────────
+
+model Movement {
+  id                String        @id @default(cuid())
+
+  itemId            String
+  item              InventoryItem @relation(fields: [itemId], references: [id])
+
+  companyId         String
+  company           Company       @relation(fields: [companyId], references: [id])
+
+  type              MovementType
+  quantity          Int
+  serialsDispatched String[]
+  condBefore        Condition?
+  condAfter         Condition
+
+  suppliedTo        String
+  destinationCode   String?
+  driverName        String
+  notes             String?
+
+  waybillId         String?
+  waybill           Waybill?      @relation(fields: [waybillId], references: [id])
+
+  movedBy           String
+  movedAt           DateTime      @default(now())
+
+  createdAt         DateTime      @default(now())
+
+  @@index([itemId])
+  @@index([companyId])
+  @@index([waybillId])
+  @@index([type])
+}
+
+// ─── Waybill ──────────────────────────────────────────────────────────────
+
+model Waybill {
+  id          String        @id @default(cuid())
+  number      String        @unique
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id])
+
+  date            DateTime
+  suppliedTo      String
+  destinationCode String
+  driverName      String
+  itemIds         String[]
+
+  generatedBy String
+  generatedAt DateTime      @default(now())
+
+  movements   Movement[]
+
+  createdAt   DateTime      @default(now())
+
+  @@index([companyId])
+}
+
+// ─── Import Batch ─────────────────────────────────────────────────────────
+
+model ImportBatch {
+  id         String          @id @default(cuid())
+  filename   String
+  rowCount   Int
+  importedBy String
+  companyId  String
+
+  items      InventoryItem[]
+
+  createdAt  DateTime        @default(now())
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────
+
+model User {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  password  String
+  active    Boolean   @default(true)
+  lastLogin DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
