@@ -1,6 +1,6 @@
 import React from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
-import { CONDITION_LABEL } from '../../lib/data'
+import { CONDITION_LABEL } from '../../lib/utils'
 import type { ConditionValue, MovementType } from '../../lib/types'
 
 const KIND_CLASS: Record<string, string> = {

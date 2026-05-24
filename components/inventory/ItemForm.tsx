@@ -15,7 +15,7 @@ import {
 import { PageHeader }           from '../ui/PageHeader'
 import { FormRow }              from '../ui/FormRow'
 import { Icon }                 from '../icons/Icon'
-import { CONDITIONS }           from '../../lib/data'
+import { CONDITIONS }           from '../../lib/utils'
 import {
   createInventoryItem,
   updateInventoryItem,

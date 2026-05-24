@@ -3,7 +3,7 @@ import { Legend }        from '../ui/Legend'
 import { LineChart }     from '../ui/LineChart'
 import { CompanyChip }   from '../ui/CompanyChip'
 import { MovementBadge } from '../ui/badges'
-import { fmtDate }       from '../../lib/data'
+import { fmtDate }       from '../../lib/utils'
 import type { ReportMovement } from '@/app/actions/reports'
 
 interface MovementSectionProps {

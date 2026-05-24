@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Input }                from '@/components/ui/input'
-import { fmtDate }              from '../../lib/data'
+import { fmtDate }              from '../../lib/utils'
 import { listWaybills }         from '@/app/actions/waybills'
 import { listCompanies }        from '@/app/actions/settings'
 

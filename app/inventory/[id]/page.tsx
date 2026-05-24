@@ -9,7 +9,7 @@ import { EmptyState }                        from '../../../components/ui/EmptyS
 import { ConditionBadge, MovementBadge }     from '../../../components/ui/badges'
 import { Loading }                           from '@/components/ui/Loading'
 import { Icon }                              from '../../../components/icons/Icon'
-import { fmtDate, CONDITION_LABEL }          from '../../../lib/data'
+import { fmtDate, CONDITION_LABEL }          from '../../../lib/utils'
 import { getInventoryItem }                  from '@/app/actions/inventory'
 import { listMovements }                     from '@/app/actions/movements'
 import { getCompany }                        from '@/app/actions/settings'

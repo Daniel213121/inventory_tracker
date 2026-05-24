@@ -10,7 +10,7 @@ import { Lettermark }                   from '../../../components/ui/Lettermark'
 import { Loading }                      from '@/components/ui/Loading'
 import { Icon }                         from '../../../components/icons/Icon'
 import { Button }                       from '@/components/ui/button'
-import { fmtDate }                      from '../../../lib/data'
+import { fmtDate }                      from '../../../lib/utils'
 import { getWaybill, logWaybillPrint }  from '@/app/actions/waybills'
 import type { TweakWaybillLayout }      from '../../../lib/types'
 

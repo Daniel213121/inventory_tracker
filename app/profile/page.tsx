@@ -15,7 +15,7 @@ import { StatusBadge } from '../../components/ui/badges'
 import { Input }       from '@/components/ui/input'
 import { Button }      from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { fmtDate }     from '../../lib/data'
+import { fmtDate }     from '../../lib/utils'
 import { logoutUser, getMyProfile, updateMyProfile, changeMyPassword } from '../actions/auth'
 
 function initials(name: string) {

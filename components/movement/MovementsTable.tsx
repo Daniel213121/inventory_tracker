@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { MovementBadge } from '../ui/badges'
 import { CompanyChip }   from '../ui/CompanyChip'
 import { EmptyState }    from '../ui/EmptyState'
-import { fmtDate }       from '../../lib/data'
+import { fmtDate }       from '../../lib/utils'
 import type { Movement } from '../../lib/types'
 
 interface Props {

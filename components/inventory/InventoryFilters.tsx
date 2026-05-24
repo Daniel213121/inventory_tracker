@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CONDITIONS } from '../../lib/data'
+import { CONDITIONS } from '../../lib/utils'
 
 interface Props {
   q:          string

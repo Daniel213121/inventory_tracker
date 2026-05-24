@@ -3,7 +3,7 @@
 import { useRouter }     from 'next/navigation'
 import { MovementBadge } from '../ui/badges'
 import { CompanyChip }   from '../ui/CompanyChip'
-import { fmtDateShort }  from '../../lib/data'
+import { fmtDateShort }  from '../../lib/utils'
 import type { DashboardMovement } from '@/app/actions/dashboard'
 
 interface Props {

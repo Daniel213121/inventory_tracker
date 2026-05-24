@@ -5,7 +5,7 @@ import { ConditionBadge } from '../ui/badges'
 import { EmptyState }     from '../ui/EmptyState'
 import { Icon }           from '../icons/Icon'
 import { Button }         from '@/components/ui/button'
-import { fmtDate } from '../../lib/data'
+import { fmtDate } from '../../lib/utils'
 import type { InventoryItem } from '../../lib/types'
 
 interface Props {

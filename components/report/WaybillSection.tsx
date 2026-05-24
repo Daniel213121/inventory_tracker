@@ -4,7 +4,7 @@ import { useRouter }    from 'next/navigation'
 import { SectionTitle } from '../ui/SectionTitle'
 import { CompanyChip }  from '../ui/CompanyChip'
 import { Icon }         from '../icons/Icon'
-import { fmtDate }      from '../../lib/data'
+import { fmtDate }      from '../../lib/utils'
 import type { ReportWaybill } from '@/app/actions/reports'
 
 interface WaybillSectionProps {

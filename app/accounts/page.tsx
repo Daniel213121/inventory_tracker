@@ -19,7 +19,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { fmtDate }              from '../../lib/data'
+import { fmtDate }              from '../../lib/utils'
 import {
   listUsers,
   createAccount,

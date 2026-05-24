@@ -1,6 +1,6 @@
 import { SectionTitle } from '../ui/SectionTitle'
 import { CompanyChip }  from '../ui/CompanyChip'
-import { fmtDate }      from '../../lib/data'
+import { fmtDate }      from '../../lib/utils'
 import type { ReportDispatched } from '@/app/actions/reports'
 
 function daysOut(movedAt: string) {
