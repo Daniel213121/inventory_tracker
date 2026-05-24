@@ -66,7 +66,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   }
   const itemsOut = [...byItem.values()].reduce((s, m) => s + m.quantity, 0)
 
-  const totalItems = inventoryItems.reduce<number>((s, item) => {
+  const totalItems = inventoryItems.reduce((s: number, item: typeof inventoryItems[number]) => {
     const qty = item.isSerialised
       ? item._count.serialUnits
       : item.qtyNew + item.qtyUsed + item.qtyFaulty
