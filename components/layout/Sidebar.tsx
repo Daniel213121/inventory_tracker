@@ -22,6 +22,8 @@ const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/inventory', label: 'Inventory', icon: 'package'  },
   { href: '/movements', label: 'Movements', icon: 'arrows'   },
   { href: '/waybills',  label: 'Waybills',  icon: 'document' },
+  { href: '/assets',    label: 'Assets',    icon: 'monitor'  },
+  { href: '/employees', label: 'Employees', icon: 'user'     },
   { href: '/reports',   label: 'Reports',   icon: 'chart'    },
   { href: '/settings',  label: 'Settings',  icon: 'gear'     },
   { href: '/accounts',  label: 'Accounts',  icon: 'users'    },

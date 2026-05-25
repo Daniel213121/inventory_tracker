@@ -37,6 +37,14 @@ import {
   ExternalLink,
   History,
   MoreHorizontal,
+  Monitor,
+  Phone,
+  Tablet,
+  UserX,
+  Briefcase,
+  Cpu,
+  Layers,
+  ArrowRightLeft,
   type LucideProps,
 } from 'lucide-react'
 import React from 'react'
@@ -48,6 +56,8 @@ export type IconName =
   | 'filter' | 'calendar' | 'bell' | 'arrowUp' | 'arrowDown' | 'arrowRight'
   | 'refresh' | 'upload' | 'building' | 'truck' | 'user' | 'key' | 'lock' | 'mail'
   | 'external' | 'history' | 'more'
+  | 'monitor' | 'phone' | 'tablet' | 'userX'
+  | 'briefcase' | 'cpu' | 'layers' | 'swap'
 
 interface IconProps {
   name: IconName
@@ -97,6 +107,14 @@ const ICON_MAP: Record<IconName, React.ComponentType<LucideProps>> = {
   external:     ExternalLink,
   history:      History,
   more:         MoreHorizontal,
+  monitor:      Monitor,
+  phone:        Phone,
+  tablet:       Tablet,
+  userX:        UserX,
+  briefcase:    Briefcase,
+  cpu:          Cpu,
+  layers:       Layers,
+  swap:         ArrowRightLeft,
 }
 
 export function Icon({

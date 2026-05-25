@@ -48,7 +48,9 @@ function serializeItem(item: any) {
     qtyFaulty,
     threshold:    item.threshold,
     supplier:     item.supplier    ?? '',
-    purchaseDate: item.purchaseDate.toISOString().slice(0, 10),
+    purchaseDate: item.purchaseDate instanceof Date && !isNaN(item.purchaseDate.getTime())
+      ? item.purchaseDate.toISOString().slice(0, 10)
+      : '',
     description:  item.description ?? '',
     notes:        item.notes       ?? '',
     imageUrl:     item.imageUrl    ?? null,
@@ -323,7 +325,11 @@ export async function importInventoryItems(
           qtyFaulty: row.isSerialised ? 0 : (cond === 'FAULTY' ? row.quantity : 0),
           threshold:     row.threshold,
           supplier:      row.supplier?.trim()    || null,
-          purchaseDate:  new Date(row.purchaseDate),
+          purchaseDate:  (() => {
+            const d = new Date(row.purchaseDate)
+            if (isNaN(d.getTime())) throw new Error(`Invalid purchaseDate "${row.purchaseDate}" in row for "${row.name}"`)
+            return d
+          })(),
           description:   row.description?.trim() || null,
           notes:         row.notes?.trim()        || null,
           importBatchId: batch.id,

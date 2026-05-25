@@ -8,7 +8,7 @@ interface DashboardStatsProps {
 
 export function DashboardStats({ totalItems, itemsOut, waybillCount }: DashboardStatsProps) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 16 }}>
       <StatCard
         icon="package"
         label="Total Inventory Items"

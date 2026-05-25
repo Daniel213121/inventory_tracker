@@ -112,6 +112,92 @@ export interface User {
   updatedAt?: string
 }
 
+// ─── Asset Management ─────────────────────────────────────────────────────
+
+export type AssetType      = 'LAPTOP' | 'PHONE' | 'TABLET' | 'MONITOR' | 'OTHER'
+export type AssetCondition = 'NEW' | 'GOOD' | 'FAIR' | 'DAMAGED' | 'BEYOND_REPAIR'
+export type AssetStatus    = 'AVAILABLE' | 'ASSIGNED' | 'UNDER_REPAIR' | 'RETIRED'
+export type TransferReason = 'RESIGNATION' | 'BEYOND_REPAIR' | 'UPGRADE' | 'REASSIGNMENT' | 'OTHER'
+
+export interface Branch {
+  id:        string
+  companyId: string
+  name:      string
+  createdAt: string
+}
+
+export interface Employee {
+  id:          string
+  companyId:   string
+  branchId:    string
+  employeeId?: string
+  name:        string
+  jobTitle:    string
+  department:  string
+  email?:      string
+  phone?:      string
+  joinedAt:    string
+  resignedAt?: string | null
+  active:      boolean
+  createdAt:   string
+  updatedAt:   string
+}
+
+export interface Asset {
+  id:              string
+  companyId:       string
+  branchId:        string
+  assetTag:        string
+  type:            AssetType
+  brand:           string
+  model:           string
+  serial:          string
+  processor?:      string
+  ram?:            string
+  storage?:        string
+  operatingSystem?: string
+  software:        string[]
+  purchaseDate?:   string
+  purchasePrice?:  number
+  warrantyExpiry?: string
+  condition:       AssetCondition
+  status:          AssetStatus
+  notes?:          string
+  createdAt:       string
+  updatedAt:       string
+}
+
+export interface AssetAssignment {
+  id:          string
+  assetId:     string
+  employeeId:  string
+  assignedAt:  string
+  assignedBy:  string
+  returnedAt?: string | null
+  returnedBy?: string | null
+  condition?:  AssetCondition
+  notes?:      string
+}
+
+export interface AssetTransfer {
+  id:              string
+  referenceNumber: string
+  assetId:         string
+  companyId:       string
+  fromEmployeeId?: string | null
+  fromCondition?:  AssetCondition | null
+  returnedAt?:     string | null
+  reason:          TransferReason
+  reasonNotes?:    string
+  toEmployeeId?:   string | null
+  assignedAt?:     string | null
+  processedBy:     string
+  authorisedBy:    string
+  generatedAt:     string
+}
+
+// ─── Tweaks ───────────────────────────────────────────────────────────────
+
 export type TweakDensity      = 'compact' | 'comfortable' | 'spacious'
 export type TweakDashLayout   = 'split' | 'wide' | 'thirds'
 export type TweakStockOutFlow = 'stepper' | 'single'

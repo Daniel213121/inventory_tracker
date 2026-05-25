@@ -37,6 +37,15 @@ enum AuditAction {
   WAYBILL_CREATED
   WAYBILL_PRINTED
 
+  // Assets
+  ASSET_CREATED
+  ASSET_ASSIGNED
+  ASSET_TRANSFERRED
+
+  // Employees
+  EMPLOYEE_CREATED
+  EMPLOYEE_RESIGNED
+
   // Settings & profile
   SETTINGS_UPDATED
   PROFILE_UPDATED
@@ -51,6 +60,37 @@ enum Condition {
 enum MovementType {
   IN
   OUT
+}
+
+enum AssetType {
+  LAPTOP
+  PHONE
+  TABLET
+  MONITOR
+  OTHER
+}
+
+enum AssetCondition {
+  NEW
+  GOOD
+  FAIR
+  DAMAGED
+  BEYOND_REPAIR
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  UNDER_REPAIR
+  RETIRED
+}
+
+enum TransferReason {
+  RESIGNATION
+  BEYOND_REPAIR
+  UPGRADE
+  REASSIGNMENT
+  OTHER
 }
 
 enum SerialStatus {
@@ -83,6 +123,10 @@ model Company {
   inventory             InventoryItem[]
   movements             Movement[]
   waybills              Waybill[]
+  branches              Branch[]
+  employees             Employee[]
+  assets                Asset[]
+  transfers             AssetTransfer[]
 
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
@@ -271,4 +315,122 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+// ─── Branch ───────────────────────────────────────────────────────────────
+
+model Branch {
+  id        String     @id @default(cuid())
+  name      String
+  companyId String
+  createdAt DateTime   @default(now())
+  company   Company    @relation(fields: [companyId], references: [id])
+  employees Employee[]
+  assets    Asset[]
+
+  @@index([companyId])
+}
+
+// ─── Employee ─────────────────────────────────────────────────────────────
+
+model Employee {
+  id               String            @id @default(cuid())
+  companyId        String
+  branchId         String
+  employeeId       String?           @unique
+  name             String
+  jobTitle         String
+  department       String
+  email            String?
+  phone            String?
+  joinedAt         DateTime
+  resignedAt       DateTime?
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  company          Company           @relation(fields: [companyId], references: [id])
+  branch           Branch            @relation(fields: [branchId], references: [id])
+  assetAssignments AssetAssignment[]
+
+  @@index([companyId])
+  @@index([branchId])
+}
+
+// ─── Asset ────────────────────────────────────────────────────────────────
+
+model Asset {
+  id              String            @id @default(cuid())
+  companyId       String
+  branchId        String
+  assetTag        String            @unique
+  type            AssetType
+  brand           String
+  model           String
+  serial          String            @unique
+  processor       String?
+  ram             String?
+  storage         String?
+  operatingSystem String?
+  software        String[]
+  purchaseDate    DateTime?
+  purchasePrice   Decimal?
+  warrantyExpiry  DateTime?
+  condition       AssetCondition
+  status          AssetStatus
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  company         Company           @relation(fields: [companyId], references: [id])
+  branch          Branch            @relation(fields: [branchId], references: [id])
+  assignments     AssetAssignment[]
+  transfers       AssetTransfer[]
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([status])
+  @@index([type])
+}
+
+// ─── Asset Assignment ─────────────────────────────────────────────────────
+
+model AssetAssignment {
+  id         String          @id @default(cuid())
+  assetId    String
+  employeeId String
+  assignedAt DateTime        @default(now())
+  assignedBy String
+  returnedAt DateTime?
+  returnedBy String?
+  condition  AssetCondition?
+  notes      String?
+  asset      Asset           @relation(fields: [assetId], references: [id])
+  employee   Employee        @relation(fields: [employeeId], references: [id])
+
+  @@index([assetId])
+  @@index([employeeId])
+}
+
+// ─── Asset Transfer ───────────────────────────────────────────────────────
+
+model AssetTransfer {
+  id               String          @id @default(cuid())
+  referenceNumber  String          @unique
+  assetId          String
+  companyId        String
+  fromEmployeeId   String?
+  fromCondition    AssetCondition?
+  returnedAt       DateTime?
+  reason           TransferReason
+  reasonNotes      String?
+  toEmployeeId     String?
+  assignedAt       DateTime?
+  processedBy      String
+  authorisedBy     String
+  generatedAt      DateTime        @default(now())
+  asset            Asset           @relation(fields: [assetId], references: [id])
+  company          Company         @relation(fields: [companyId], references: [id])
+
+  @@index([assetId])
+  @@index([companyId])
+  @@index([referenceNumber])
 }
