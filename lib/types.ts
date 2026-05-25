@@ -72,6 +72,7 @@ export interface Movement {
   itemIsSerialised:   boolean
   companyId:          string
   companyCode:        string | null
+  companyLogoUrl:     string | null
   type:               MovementType
   waybillNumber:      string | null
   quantity:           number

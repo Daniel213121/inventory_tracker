@@ -16,31 +16,33 @@ export type ReportCategory = {
 }
 
 export type ReportInventoryItem = {
-  id:            string
-  name:          string
-  companyId:     string
-  companyCode:   string
-  companyName:   string
-  categoryId:    string
-  categoryLabel: string
-  qtyNew:        number
-  qtyUsed:       number
-  qtyFaulty:     number
-  quantity:      number
-  threshold:     number
+  id:             string
+  name:           string
+  companyId:      string
+  companyCode:    string
+  companyName:    string
+  companyLogoUrl: string | null
+  categoryId:     string
+  categoryLabel:  string
+  qtyNew:         number
+  qtyUsed:        number
+  qtyFaulty:      number
+  quantity:       number
+  threshold:      number
 }
 
 export type ReportMovement = {
-  id:          string
-  itemName:    string
-  companyId:   string
-  companyCode: string
-  companyName: string
-  type:        'IN' | 'OUT'
-  quantity:    number
-  suppliedTo:  string
-  movedBy:     string
-  movedAt:     string
+  id:             string
+  itemName:       string
+  companyId:      string
+  companyCode:    string
+  companyName:    string
+  companyLogoUrl: string | null
+  type:           'IN' | 'OUT'
+  quantity:       number
+  suppliedTo:     string
+  movedBy:        string
+  movedAt:        string
 }
 
 export type ReportDispatched = {
@@ -49,6 +51,7 @@ export type ReportDispatched = {
   companyId:         string
   companyCode:       string
   companyName:       string
+  companyLogoUrl:    string | null
   quantity:          number
   serialsDispatched: string[]
   suppliedTo:        string
@@ -56,15 +59,16 @@ export type ReportDispatched = {
 }
 
 export type ReportWaybill = {
-  id:          string
-  number:      string
-  companyId:   string
-  companyCode: string
-  companyName: string
-  date:        string
-  suppliedTo:  string
-  driverName:  string
-  generatedBy: string
+  id:             string
+  number:         string
+  companyId:      string
+  companyCode:    string
+  companyName:    string
+  companyLogoUrl: string | null
+  date:           string
+  suppliedTo:     string
+  driverName:     string
+  generatedBy:    string
 }
 
 export type ReportData = {
@@ -149,10 +153,11 @@ export async function getReportData(filters: {
       return {
         id:            item.id,
         name:          item.name,
-        companyId:     item.companyId,
-        companyCode:   item.company.code,
-        companyName:   item.company.name,
-        categoryId:    item.categoryId,
+        companyId:      item.companyId,
+        companyCode:    item.company.code,
+        companyName:    item.company.name,
+        companyLogoUrl: item.company.logoUrl ?? null,
+        categoryId:     item.categoryId,
         categoryLabel: item.category.label,
         qtyNew, qtyUsed, qtyFaulty,
         quantity:      item.isSerialised ? units.length : qtyNew + qtyUsed + qtyFaulty,
@@ -161,12 +166,13 @@ export async function getReportData(filters: {
     }),
 
     movements: periodMovements.map(m => ({
-      id:          m.id,
-      itemName:    m.item.name,
-      companyId:   m.companyId,
-      companyCode: m.company.code,
-      companyName: m.company.name,
-      type:        m.type as 'IN' | 'OUT',
+      id:             m.id,
+      itemName:       m.item.name,
+      companyId:      m.companyId,
+      companyCode:    m.company.code,
+      companyName:    m.company.name,
+      companyLogoUrl: m.company.logoUrl ?? null,
+      type:           m.type as 'IN' | 'OUT',
       quantity:    m.quantity,
       suppliedTo:  m.suppliedTo,
       movedBy:     m.movedBy,
@@ -179,6 +185,7 @@ export async function getReportData(filters: {
       companyId:         m.companyId,
       companyCode:       m.company.code,
       companyName:       m.company.name,
+      companyLogoUrl:    m.company.logoUrl ?? null,
       quantity:          m.quantity,
       serialsDispatched: m.serialsDispatched,
       suppliedTo:        m.suppliedTo,
@@ -186,12 +193,13 @@ export async function getReportData(filters: {
     })),
 
     waybills: waybills.map(w => ({
-      id:          w.id,
-      number:      w.number,
-      companyId:   w.companyId,
-      companyCode: w.company.code,
-      companyName: w.company.name,
-      date:        w.date.toISOString().slice(0, 10),
+      id:             w.id,
+      number:         w.number,
+      companyId:      w.companyId,
+      companyCode:    w.company.code,
+      companyName:    w.company.name,
+      companyLogoUrl: w.company.logoUrl ?? null,
+      date:           w.date.toISOString().slice(0, 10),
       suppliedTo:  w.suppliedTo,
       driverName:  w.driverName,
       generatedBy: w.generatedBy,

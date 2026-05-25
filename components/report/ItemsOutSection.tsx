@@ -58,7 +58,7 @@ export function ItemsOutSection({ dispatched }: ItemsOutSectionProps) {
                   }}>
                     {d}d
                   </td>
-                  <td><CompanyChip code={m.companyCode} name={m.companyName} /></td>
+                  <td><CompanyChip code={m.companyCode} name={m.companyName} logoUrl={m.companyLogoUrl} /></td>
                 </tr>
               )
             })}

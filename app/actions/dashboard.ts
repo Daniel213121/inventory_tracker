@@ -3,16 +3,17 @@
 import { prisma } from '@/lib/db'
 
 export type DashboardMovement = {
-  id:          string
-  itemId:      string
-  itemName:    string
-  companyId:   string
-  companyCode: string
-  companyName: string
-  type:        'IN' | 'OUT'
-  quantity:    number
-  movedBy:     string
-  movedAt:     string
+  id:             string
+  itemId:         string
+  itemName:       string
+  companyId:      string
+  companyCode:    string
+  companyName:    string
+  companyLogoUrl: string | null
+  type:           'IN' | 'OUT'
+  quantity:       number
+  movedBy:        string
+  movedAt:        string
 }
 
 export type DashboardInventorySummary = {
@@ -47,7 +48,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     }),
 
     prisma.movement.findMany({
-      include: { item: { select: { name: true } }, company: { select: { code: true, name: true } } },
+      include: { item: { select: { name: true } }, company: { select: { code: true, name: true, logoUrl: true } } },
       orderBy: { movedAt: 'asc' },
     }),
 
@@ -86,9 +87,10 @@ export async function getDashboardData(): Promise<DashboardData> {
       itemId:      m.itemId,
       itemName:    m.item.name,
       companyId:   m.companyId,
-      companyCode: m.company.code,
-      companyName: m.company.name,
-      type:        m.type as 'IN' | 'OUT',
+      companyCode:    m.company.code,
+      companyName:    m.company.name,
+      companyLogoUrl: m.company.logoUrl ?? null,
+      type:           m.type as 'IN' | 'OUT',
       quantity:    m.quantity,
       movedBy:     m.movedBy,
       movedAt:     m.movedAt.toISOString(),

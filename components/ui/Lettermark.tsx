@@ -1,7 +1,5 @@
-import React from 'react'
-
 interface LettermarkProps {
-  company: { id?: string; code: string }
+  company: { id?: string; code: string; logoUrl?: string | null }
   size?: number
 }
 
@@ -11,6 +9,24 @@ const PALETTE: Record<string, { a: string; b: string }> = {
 }
 
 export function Lettermark({ company, size = 32 }: LettermarkProps) {
+  if (company.logoUrl) {
+    return (
+      <img
+        src={company.logoUrl}
+        alt={company.code}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 6,
+          objectFit: 'contain',
+          background: '#fff',
+          border: '1px solid var(--border)',
+          flexShrink: 0,
+        }}
+      />
+    )
+  }
+
   const { a, b } = PALETTE[company.id ?? ''] ?? { a: '#1E3A5F', b: '#2563EB' }
 
   return (

@@ -61,7 +61,7 @@ export function StockSection({ inventory, categories, companies, companyFilter }
               <tr key={item.id}>
                 <td style={{ fontWeight: 500 }}>{item.name}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{item.categoryLabel}</td>
-                <td><CompanyChip code={item.companyCode} name={item.companyName} /></td>
+                <td><CompanyChip code={item.companyCode} name={item.companyName} logoUrl={item.companyLogoUrl} /></td>
                 <td>
                   {item.qtyNew    > 0 && <ConditionBadge value="NEW" />}
                   {item.qtyUsed   > 0 && <ConditionBadge value="USED" />}

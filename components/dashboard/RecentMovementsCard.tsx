@@ -52,7 +52,7 @@ export function RecentMovementsCard({ compact, movements }: Props) {
                 <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{fmtDateShort(m.movedAt)}</td>
                 <td style={{ fontWeight: 500, fontSize: 13 }}>{m.itemName}</td>
                 <td><MovementBadge type={m.type} /></td>
-                {!compact && <td><CompanyChip code={m.companyCode} name={m.companyName} /></td>}
+                {!compact && <td><CompanyChip code={m.companyCode} name={m.companyName} logoUrl={m.companyLogoUrl} /></td>}
                 <td style={{ fontWeight: 600 }}>{m.quantity}</td>
                 {!compact && <td className="muted" style={{ fontSize: 13 }}>{m.movedBy}</td>}
               </tr>

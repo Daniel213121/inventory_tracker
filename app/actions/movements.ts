@@ -15,6 +15,7 @@ function serializeMovement(m: any) {
     itemName:          m.item?.name        ?? null,
     companyId:         m.companyId,
     companyCode:       m.company?.code     ?? null,
+    companyLogoUrl:    m.company?.logoUrl  ?? null,
     type:              m.type,
     quantity:          m.quantity,
     serialsDispatched: m.serialsDispatched,

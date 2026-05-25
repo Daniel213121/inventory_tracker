@@ -18,16 +18,17 @@ import { listWaybills }         from '@/app/actions/waybills'
 import { listCompanies }        from '@/app/actions/settings'
 
 type WaybillSummary = {
-  id:          string
-  number:      string
-  companyId:   string
-  companyCode: string
-  companyName: string
-  date:        string
-  suppliedTo:  string
-  lineCount:   number
-  generatedBy: string
-  generatedAt: string
+  id:             string
+  number:         string
+  companyId:      string
+  companyCode:    string
+  companyName:    string
+  companyLogoUrl: string | null
+  date:           string
+  suppliedTo:     string
+  lineCount:      number
+  generatedBy:    string
+  generatedAt:    string
 }
 
 function WaybillsContent() {
@@ -139,7 +140,7 @@ function WaybillsContent() {
                       {w.number}
                     </span>
                   </td>
-                  <td><CompanyChip code={w.companyCode} name={w.companyName} /></td>
+                  <td><CompanyChip code={w.companyCode} name={w.companyName} logoUrl={w.companyLogoUrl} /></td>
                   <td className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{fmtDate(w.date)}</td>
                   <td style={{ fontSize: 13 }}>{w.suppliedTo}</td>
                   <td style={{ fontSize: 13 }}>{w.lineCount} line{w.lineCount !== 1 ? 's' : ''}</td>

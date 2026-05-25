@@ -56,7 +56,7 @@ export function MovementSection({ dayLabels, inSeries, outSeries, movements }: M
                 <td><MovementBadge type={m.type} /></td>
                 <td style={{ fontWeight: 600 }}>{m.quantity}</td>
                 <td style={{ fontSize: 13 }}>{m.suppliedTo || '—'}</td>
-                <td><CompanyChip code={m.companyCode} name={m.companyName} /></td>
+                <td><CompanyChip code={m.companyCode} name={m.companyName} logoUrl={m.companyLogoUrl} /></td>
                 <td className="muted" style={{ fontSize: 13 }}>{m.movedBy}</td>
               </tr>
             ))}

@@ -53,7 +53,7 @@ export function WaybillSection({ waybills }: WaybillSectionProps) {
                     {w.number}
                   </span>
                 </td>
-                <td><CompanyChip code={w.companyCode} name={w.companyName} /></td>
+                <td><CompanyChip code={w.companyCode} name={w.companyName} logoUrl={w.companyLogoUrl} /></td>
                 <td className="muted" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{fmtDate(w.date)}</td>
                 <td style={{ fontSize: 13 }}>{w.suppliedTo}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{w.driverName}</td>

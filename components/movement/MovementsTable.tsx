@@ -51,7 +51,7 @@ export function MovementsTable({ movements }: Props) {
               <td style={{ fontSize: 13 }}>{m.suppliedTo || '—'}</td>
               <td>
                 {m.companyCode
-                  ? <CompanyChip code={m.companyCode} name={m.companyCode} />
+                  ? <CompanyChip code={m.companyCode} name={m.companyCode} logoUrl={m.companyLogoUrl ?? null} />
                   : <span className="muted">—</span>
                 }
               </td>
