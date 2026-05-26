@@ -20,9 +20,10 @@ export function StockOutStep4Review({ company, lines, details }: Props) {
   const summaryFields: [string, string | undefined][] = [
     ['Company',          company.name],
     ['Supplied To',      details.suppliedTo],
+    ['Location',         details.deliveryLocation || undefined],
     ['Destination Code', details.destinationCode],
     ['Driver',           details.driverName],
-    ['Car / Plate',      details.carNumber || undefined],
+    ['Car / Plate No.',  details.carNumber || undefined],
     ['Date',             details.date],
   ]
 

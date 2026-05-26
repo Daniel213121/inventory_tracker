@@ -251,8 +251,10 @@ model Waybill {
   date            DateTime
   suppliedTo      String
   destinationCode String
-  driverName      String
-  itemIds         String[]
+  driverName        String
+  carNumber         String?
+  deliveryLocation  String?
+  itemIds           String[]
 
   generatedBy String
   generatedAt DateTime      @default(now())

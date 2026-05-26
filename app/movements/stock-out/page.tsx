@@ -29,7 +29,7 @@ function StockOutForm() {
   const [companyId,   setCompanyId]   = useState('')
   const [lines,       setLines]       = useState<Line[]>([])
   const [details,     setDetails]     = useState<Details>({
-    suppliedTo: '', destinationCode: '', driverName: '', carNumber: '',
+    suppliedTo: '', destinationCode: '', deliveryLocation: '', driverName: '', carNumber: '',
     date: new Date().toISOString().slice(0, 10), notes: '',
   })
   const [submitting, setSubmitting] = useState(false)
@@ -74,11 +74,13 @@ function StockOutForm() {
       const result = await stockOut({
         companyId,
         lines:           lines.map(l => ({ itemId: l.itemId, qty: l.qty, selectedSerials: l.selectedSerials, conditionFrom: l.conditionFrom })),
-        suppliedTo:      details.suppliedTo,
-        destinationCode: details.destinationCode,
-        driverName:      details.driverName,
-        notes:           details.notes || undefined,
-        date:            details.date || undefined,
+        suppliedTo:       details.suppliedTo,
+        destinationCode:  details.destinationCode,
+        deliveryLocation: details.deliveryLocation || undefined,
+        driverName:       details.driverName,
+        carNumber:        details.carNumber || undefined,
+        notes:            details.notes || undefined,
+        date:             details.date || undefined,
       })
       toast.success(`Waybill ${result.waybillNumber} generated`, {
         description: `${totalUnits} unit${totalUnits !== 1 ? 's' : ''} dispatched to ${details.suppliedTo}`,

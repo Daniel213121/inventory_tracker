@@ -30,12 +30,13 @@ export function suggestDestCode(suppliedTo: string): string {
 /* ─── Schema ─────────────────────────────────────────────────────────── */
 
 const schema = z.object({
-  suppliedTo:      z.string().min(1, 'Supplied to is required'),
-  destinationCode: z.string().min(1, 'Destination code is required').max(6, 'Max 6 characters').regex(/^[A-Z0-9]+$/, 'Uppercase letters and numbers only'),
-  driverName:          z.string().min(1, 'Driver name is required'),
-  carNumber:       z.string().optional(),
-  date:            z.string().min(1, 'Date is required'),
-  notes:           z.string().optional(),
+  suppliedTo:       z.string().min(1, 'Supplied to is required'),
+  destinationCode:  z.string().min(1, 'Destination code is required').max(6, 'Max 6 characters').regex(/^[A-Z0-9]+$/, 'Uppercase letters and numbers only'),
+  deliveryLocation: z.string().optional(),
+  driverName:       z.string().min(1, 'Driver name is required'),
+  carNumber:        z.string().optional(),
+  date:             z.string().min(1, 'Date is required'),
+  notes:            z.string().optional(),
 })
 
 type Fields = z.infer<typeof schema>
@@ -65,12 +66,13 @@ export const StockOutStep3Details = forwardRef<Step3Handle, Props>(
     } = useForm<Fields>({
       resolver: zodResolver(schema) as Resolver<Fields>,
       defaultValues: {
-        suppliedTo:      details.suppliedTo,
-        destinationCode: details.destinationCode,
-        driverName:          details.driverName,
-        carNumber:       details.carNumber,
-        date:            details.date,
-        notes:           details.notes,
+        suppliedTo:       details.suppliedTo,
+        destinationCode:  details.destinationCode,
+        deliveryLocation: details.deliveryLocation,
+        driverName:       details.driverName,
+        carNumber:        details.carNumber,
+        date:             details.date,
+        notes:            details.notes,
       },
       mode: 'onBlur',
     })
@@ -113,6 +115,14 @@ export const StockOutStep3Details = forwardRef<Step3Handle, Props>(
               onBlur={handleSuppliedToBlur}
               onChange={sync('suppliedTo')}
               placeholder="e.g. TG Bank — Head Office"
+            />
+          </FormRow>
+
+          <FormRow label="Location" hint="City or address of delivery">
+            <Input
+              {...register('deliveryLocation')}
+              onChange={sync('deliveryLocation')}
+              placeholder="e.g. Accra"
             />
           </FormRow>
 

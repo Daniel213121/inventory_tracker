@@ -10,10 +10,11 @@ export interface Line {
 }
 
 export interface Details {
-  suppliedTo:      string
-  destinationCode: string
-  driverName:      string
-  carNumber:       string
-  date:            string
-  notes:           string
+  suppliedTo:       string
+  destinationCode:  string
+  deliveryLocation: string
+  driverName:       string
+  carNumber:        string
+  date:             string
+  notes:            string
 }

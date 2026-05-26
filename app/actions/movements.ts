@@ -225,11 +225,13 @@ export async function stockOut(data: {
     selectedSerials: string[]
     conditionFrom?:  string   // non-serialised: which condition bucket to draw from
   }>
-  suppliedTo:      string
-  destinationCode: string
-  driverName:      string
-  notes?:          string
-  date?:           string
+  suppliedTo:       string
+  destinationCode:  string
+  deliveryLocation?: string
+  driverName:       string
+  carNumber?:       string
+  notes?:           string
+  date?:            string
 }) {
   const actor = await getCurrentUser()
   if (!actor) throw new Error('Unauthorized')
@@ -295,14 +297,16 @@ export async function stockOut(data: {
     // Create the waybill
     const waybill = await tx.waybill.create({
       data: {
-        number:          waybillNumber,
-        companyId:       data.companyId,
-        date:            movedAt,
-        suppliedTo:      data.suppliedTo,
-        destinationCode: data.destinationCode,
-        driverName:      data.driverName,
-        itemIds:         movements.map(m => m.id),
-        generatedBy:     actor.name,
+        number:           waybillNumber,
+        companyId:        data.companyId,
+        date:             movedAt,
+        suppliedTo:       data.suppliedTo,
+        destinationCode:  data.destinationCode,
+        deliveryLocation: data.deliveryLocation?.trim() || null,
+        driverName:       data.driverName,
+        carNumber:        data.carNumber?.trim() || null,
+        itemIds:          movements.map(m => m.id),
+        generatedBy:      actor.name,
       },
     })
 

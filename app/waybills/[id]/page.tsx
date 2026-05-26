@@ -2,7 +2,7 @@
 
 import { useEffect, useState }          from 'react'
 import { useParams, useRouter }         from 'next/navigation'
-import { AppShell, useTweaksContext }   from '../../../components/layout/AppShell'
+import { AppShell }                     from '../../../components/layout/AppShell'
 import { PageHeader }                   from '../../../components/ui/PageHeader'
 import { SectionTitle }                 from '../../../components/ui/SectionTitle'
 import { EmptyState }                   from '../../../components/ui/EmptyState'
@@ -12,7 +12,8 @@ import { Icon }                         from '../../../components/icons/Icon'
 import { Button }                       from '@/components/ui/button'
 import { fmtDate }                      from '../../../lib/utils'
 import { getWaybill, logWaybillPrint }  from '@/app/actions/waybills'
-import type { TweakWaybillLayout }      from '../../../lib/types'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type WaybillLine = {
   id:                string
@@ -40,21 +41,26 @@ type WaybillCompany = {
   brandSubtitle:         string
   authoriserName:        string
   authoriserDesignation: string
+  logoUrl:               string | null
 }
 
 type WaybillDetail = {
-  id:              string
-  number:          string
-  companyId:       string
-  date:            string
-  suppliedTo:      string
-  destinationCode: string
-  driverName:      string
-  generatedBy:     string
-  generatedAt:     string
-  company:         WaybillCompany | null
-  lines:           WaybillLine[]
+  id:               string
+  number:           string
+  companyId:        string
+  date:             string
+  suppliedTo:       string
+  destinationCode:  string
+  deliveryLocation: string | null
+  driverName:       string
+  carNumber:        string | null
+  generatedBy:      string
+  generatedAt:      string
+  company:          WaybillCompany | null
+  lines:            WaybillLine[]
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function KV({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -65,171 +71,250 @@ function KV({ label, children }: { label: string; children: React.ReactNode }) {
   )
 }
 
-function ordinalDate(dateStr: string): string {
+function ordinalDate(dateStr: string): React.ReactNode {
   const d      = new Date(dateStr)
   const day    = d.getDate()
-  const suffix = [11, 12, 13].includes(day) ? 'TH'
-    : day % 10 === 1 ? 'ST'
-    : day % 10 === 2 ? 'ND'
-    : day % 10 === 3 ? 'RD'
-    : 'TH'
-  const month = d.toLocaleString('en-GB', { month: 'long' }).toUpperCase()
-  return `${day}${suffix} ${month} ${d.getFullYear()}`
+  const suffix = [11, 12, 13].includes(day) ? 'th'
+    : day % 10 === 1 ? 'st'
+    : day % 10 === 2 ? 'nd'
+    : day % 10 === 3 ? 'rd'
+    : 'th'
+  const month = d.toLocaleString('en-GB', { month: 'long' })
+  return <>{day}<sup style={{ fontSize: '0.65em' }}>{suffix}</sup> {month} {d.getFullYear()}</>
 }
 
-function Logo({ company, accent }: { company: WaybillCompany; accent: string }) {
+const LINE_MIN = 8
+
+function blankRows(count: number) {
+  return Array.from({ length: count }, (_, i) => (
+    <tr key={`blank-${i}`}>
+      <td style={{ border: '1px solid #ccc', padding: '8px 6px', height: 28 }}>&nbsp;</td>
+      <td style={{ border: '1px solid #ccc', padding: '8px 6px' }}>&nbsp;</td>
+      <td style={{ border: '1px solid #ccc', padding: '8px 6px' }}>&nbsp;</td>
+    </tr>
+  ))
+}
+
+function ItemsTable({ lines, padRows }: { lines: WaybillLine[]; padRows: number }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <svg width={62} height={46} viewBox="0 0 62 46">
-        <path d="M2,2 L16,2 L28,23 L16,44 L2,44 L12,23 Z" fill="#5A2F8E" />
-        <path d="M20,2 L34,2 L46,23 L34,44 L20,44 L30,23 Z" fill="#E89A2B" />
-        <path d="M38,2 L52,2 L62,23 L52,44 L38,44 L48,23 Z" fill="#5A2F8E" />
-      </svg>
+    <table style={{ width: '100%', borderCollapse: 'collapse', margin: '20px 0 32px' }}>
+      <thead>
+        <tr>
+          <th style={{ border: '1px solid #ccc', padding: '7px 6px', width: 52, textAlign: 'center', fontWeight: 700, fontSize: 12 }}>NO.</th>
+          <th style={{ border: '1px solid #ccc', padding: '7px 6px', textAlign: 'center', fontWeight: 700, fontSize: 12 }}>DESCRIPTION</th>
+          <th style={{ border: '1px solid #ccc', padding: '7px 6px', width: 72, textAlign: 'center', fontWeight: 700, fontSize: 12 }}>QTY</th>
+        </tr>
+      </thead>
+      <tbody>
+        {lines.map((line, i) => (
+          <tr key={line.id}>
+            <td style={{ border: '1px solid #ccc', padding: '8px 6px', textAlign: 'center' }}>{i + 1}</td>
+            <td style={{ border: '1px solid #ccc', padding: '8px 6px' }}>
+              <div>{line.name}{line.brand || line.model ? ` (${[line.brand, line.model].filter(Boolean).join(' ')})` : ''}</div>
+              {line.serialsDispatched.length > 0 && (
+                <div style={{ color: '#555', fontSize: 11 }}>S/N: {line.serialsDispatched.join(', ')}</div>
+              )}
+            </td>
+            <td style={{ border: '1px solid #ccc', padding: '8px 6px', textAlign: 'center' }}>{line.qty} pc</td>
+          </tr>
+        ))}
+        {blankRows(padRows)}
+      </tbody>
+    </table>
+  )
+}
+
+function CompanyLogo({ company, height = 120 }: { company: WaybillCompany; height?: number }) {
+  if (company.logoUrl) {
+    return (
+      <img
+        src={company.logoUrl}
+        alt={company.code}
+        style={{ height, width: 'auto', objectFit: 'contain' }}
+      />
+    )
+  }
+  return <div style={{ fontSize: 36, fontWeight: 800, color: '#1E3A5F' }}>{company.code}</div>
+}
+
+function SignatureBlock({ company, waybill }: { company: WaybillCompany; waybill: WaybillDetail }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40 }}>
       <div>
-        <div style={{ fontSize: 38, fontWeight: 800, color: '#5A2F8E', lineHeight: 1 }}>
-          {company.code}
-        </div>
-        <div style={{ height: 2, background: accent, margin: '4px 0' }} />
-        <div style={{ fontSize: 10.5, color: '#333' }}>{company.name}</div>
-        <div style={{ fontSize: 10, fontStyle: 'italic', color: '#666' }}>{company.brandSubtitle}</div>
+        <div style={{ borderBottom: '1px dotted #555', marginBottom: 8, height: 32 }} />
+        <div style={{ fontSize: 12 }}>FOR: {company.fullName.toUpperCase()}</div>
+        <div style={{ fontSize: 12 }}>{company.authoriserName}</div>
+        <div style={{ fontSize: 12 }}>DESIGNATION: {company.authoriserDesignation}</div>
+      </div>
+      <div>
+        <div style={{ borderBottom: '1px dotted #555', marginBottom: 8, height: 32 }} />
+        <div style={{ fontSize: 12 }}>FOR: {waybill.suppliedTo}</div>
+        <div style={{ fontSize: 12 }}>NAME:</div>
+        <div style={{ fontSize: 12 }}>DESIGNATION:</div>
       </div>
     </div>
   )
 }
 
-function WaybillBody({
-  waybill,
-  company,
-  lines,
-  layout,
-}: {
+// ─── VIA Layout ───────────────────────────────────────────────────────────────
+
+function VIAWaybillBody({ waybill, company, lines }: {
   waybill: WaybillDetail
   company: WaybillCompany
   lines:   WaybillLine[]
-  layout:  TweakWaybillLayout
 }) {
-  const accent   = company.code === 'VSA' ? '#D4A017' : '#0EA5E9'
-  const totalQty = lines.reduce((s, l) => s + l.qty, 0)
-
-  if (layout !== 'modern') {
-    return (
-      <div style={{ color: '#999', fontSize: 13, padding: 40, textAlign: 'center' }}>
-        Layout &ldquo;{layout}&rdquo; — TODO
-      </div>
-    )
-  }
+  const padRows = Math.max(0, LINE_MIN - lines.length)
 
   return (
-    <>
-      {/* Top row: tagline left, logo right */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 24 }}>
-        <div style={{ flex: 1, textAlign: 'center', color: '#3F2B70', fontSize: 11.5, lineHeight: 1.75 }}>
-          {company.tagline}
-          <br />
-          {company.taglineLine2}
+    <div style={{ fontFamily: "'Inter', Arial, sans-serif", color: '#111', fontSize: 13 }}>
+
+      {/* Header — address/contact left, logo right */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, minHeight: 90 }}>
+        <div style={{ fontSize: 11, color: '#333', lineHeight: 2 }}>
+          <div>{company.addressGhana}</div>
+          <div>TEL: {[company.phoneGhana, company.mobileGhana].filter(Boolean).join(' / ')}&nbsp;&nbsp;|&nbsp;&nbsp;EMAIL: {company.email}</div>
         </div>
-        <Logo company={company} accent={accent} />
+        <div style={{ flexShrink: 0, marginLeft: 32 }}>
+          <CompanyLogo company={company} />
+        </div>
       </div>
 
       {/* Title */}
-      <h1 style={{ textAlign: 'center', fontSize: 44, fontWeight: 700, margin: '12px 0 18px', letterSpacing: '0.02em' }}>
+      <h1 style={{ textAlign: 'center', fontSize: 46, fontWeight: 900, letterSpacing: '0.04em', margin: '0 0 20px' }}>
         WAYBILL
       </h1>
 
       {/* Date + Number */}
-      <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, marginBottom: 28 }}>
-        DATE: {ordinalDate(waybill.date)}&nbsp;&nbsp;&nbsp;&nbsp;WAYBILL NO: {waybill.number}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 13 }}>
+        <div><strong>DATE:&nbsp;</strong>{ordinalDate(waybill.date)}</div>
+        <div><strong>WAYBILL NO.:&nbsp;</strong>{waybill.number}</div>
       </div>
 
-      {/* Destination block */}
-      <div style={{ borderTop: `2px solid ${accent}`, borderBottom: `2px solid ${accent}`, padding: '12px 0', marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 32 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#888' }}>
-              Supplied To
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4 }}>{waybill.suppliedTo}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#888' }}>
-              Waybill No
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4 }}>{waybill.number}</div>
+      {/* Supplied to + Driver */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 6 }}>
+        <div>
+          <div style={{ textDecoration: 'underline', fontWeight: 600, marginBottom: 4 }}>SUPPLIED TO:</div>
+          <div>{waybill.suppliedTo}</div>
+          {waybill.deliveryLocation && (
+            <div style={{ textTransform: 'uppercase' }}>{waybill.deliveryLocation}</div>
+          )}
+        </div>
+        <div>
+          <div style={{ marginBottom: 4 }}><strong>DRIVER:&nbsp;</strong>{waybill.driverName}</div>
+          <div style={{ marginTop: 8 }}>
+            <strong>CAR NUMBER:&nbsp;</strong>
+            <span style={{ borderBottom: '1px solid #333', display: 'inline-block', minWidth: 100 }}>
+              {waybill.carNumber ? ` ${waybill.carNumber}` : ' '}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Items table */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-        <thead>
-          <tr>
-            {['QTY', 'DESCRIPTION', 'REMARKS'].map(col => (
-              <th key={col} style={{
-                borderBottom: `2px solid ${accent}`, fontSize: 11, fontWeight: 600,
-                textTransform: 'uppercase', letterSpacing: '0.05em',
-                padding: '4px 8px', textAlign: 'left',
-              }}>
-                {col}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line, i) => (
-            <tr key={i}>
-              <td style={{ padding: '6px 8px', borderBottom: '1px solid #eee', width: 48 }}>{line.qty}</td>
-              <td style={{ padding: '6px 8px', borderBottom: '1px solid #eee' }}>
-                {line.name} ({line.brand} {line.model})
-                {line.serialsDispatched.length > 0 && (
-                  <span style={{ color: '#555', fontSize: 11 }}> — SN: {line.serialsDispatched.join(', ')}</span>
-                )}
-              </td>
-              <td style={{ padding: '6px 8px', borderBottom: '1px solid #eee' }}></td>
-            </tr>
-          ))}
-          <tr>
-            <td style={{ padding: '6px 8px', fontWeight: 600 }}>{totalQty}</td>
-            <td style={{ padding: '6px 8px' }}>—</td>
-            <td style={{ padding: '6px 8px' }}>All items as listed</td>
-          </tr>
-        </tbody>
-      </table>
+      <ItemsTable lines={lines} padRows={padRows} />
 
-      {/* Signatures */}
-      <div style={{ marginTop: 40, borderTop: '1px solid #ccc', paddingTop: 24 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 32 }}>
-          <div>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#888', letterSpacing: '0.05em' }}>Supplied by</div>
-            <div style={{ borderBottom: '1px solid #999', marginTop: 40 }} />
-            <div style={{ fontSize: 12, marginTop: 6 }}>{company.authoriserName}</div>
-            <div style={{ fontSize: 11, color: '#888' }}>{company.authoriserDesignation}</div>
-            <div style={{ fontSize: 11, color: '#888' }}>{company.code}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#888', letterSpacing: '0.05em' }}>Received by</div>
-            <div style={{ borderBottom: '1px solid #999', marginTop: 40 }} />
-            <div style={{ fontSize: 12, marginTop: 6, color: '#888' }}>{waybill.driverName}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#888', letterSpacing: '0.05em' }}>Authorized by</div>
-            <div style={{ borderBottom: '1px solid #999', marginTop: 40 }} />
-          </div>
-        </div>
-      </div>
+      <div style={{ marginBottom: 24, height: 56 }} />
 
-      {/* Footer */}
-      <div style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #eee', fontSize: 10, color: '#555', textAlign: 'center' }}>
-        <div>{company.fullName}&nbsp;|&nbsp;{company.addressGhana}&nbsp;|&nbsp;{company.addressUSA}</div>
-        <div>{company.phoneGhana} / {company.mobileGhana}&nbsp;|&nbsp;{company.phoneUSA}&nbsp;|&nbsp;{company.email}&nbsp;|&nbsp;{company.website}</div>
+      <SignatureBlock company={company} waybill={waybill} />
+
+      {/* Blue rule + footer */}
+      <div style={{ borderTop: '3px solid #0EA5E9', marginTop: 28 }} />
+      <div style={{ textAlign: 'center', fontSize: 11, color: '#333', marginTop: 10, lineHeight: 1.8 }}>
+        <div style={{ fontWeight: 600 }}>{company.fullName}</div>
+        <div>{company.addressGhana}&nbsp;&nbsp;|&nbsp;&nbsp;Tel: {[company.phoneGhana, company.mobileGhana].filter(Boolean).join(' / ')}</div>
+        <div>Email: {company.email}&nbsp;&nbsp;|&nbsp;&nbsp;{company.website}</div>
       </div>
-    </>
+    </div>
   )
 }
 
+// ─── VSA Layout ───────────────────────────────────────────────────────────────
+
+function VSAWaybillBody({ waybill, company, lines }: {
+  waybill: WaybillDetail
+  company: WaybillCompany
+  lines:   WaybillLine[]
+}) {
+  const padRows = Math.max(0, LINE_MIN - lines.length)
+
+  return (
+    <div style={{ fontFamily: "'Inter', Arial, sans-serif", color: '#111', fontSize: 13 }}>
+
+      {/* Header — tagline left, logo right */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, minHeight: 90 }}>
+        <div style={{ fontSize: 11, color: '#333', lineHeight: 2 }}>
+          {company.tagline}{company.taglineLine2 ? ` | ${company.taglineLine2}` : ''}
+        </div>
+        <div style={{ flexShrink: 0, marginLeft: 32 }}>
+          <CompanyLogo company={company} />
+        </div>
+      </div>
+
+      {/* Title */}
+      <h1 style={{ textAlign: 'center', fontSize: 46, fontWeight: 900, letterSpacing: '0.04em', margin: '0 0 20px' }}>
+        WAYBILL
+      </h1>
+
+      {/* Date + Number */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 13 }}>
+        <div><strong>DATE:&nbsp;</strong>{ordinalDate(waybill.date)}</div>
+        <div><strong>WAYBILL NO.:&nbsp;</strong>{waybill.number}</div>
+      </div>
+
+      {/* Supplied to + Driver */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 6 }}>
+        <div>
+          <div style={{ textDecoration: 'underline', fontWeight: 600, marginBottom: 4 }}>SUPPLIED TO:</div>
+          <div>{waybill.suppliedTo}</div>
+          {waybill.deliveryLocation && (
+            <div style={{ textTransform: 'uppercase' }}>{waybill.deliveryLocation}</div>
+          )}
+        </div>
+        <div>
+          <div style={{ marginBottom: 4 }}><strong>DRIVER:&nbsp;</strong>{waybill.driverName}</div>
+          <div style={{ marginTop: 8 }}>
+            <strong>CAR NUMBER:&nbsp;</strong>
+            <span style={{ borderBottom: '1px solid #333', display: 'inline-block', minWidth: 120 }}>
+              {waybill.carNumber ? ` ${waybill.carNumber}` : ' '}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <ItemsTable lines={lines} padRows={padRows} />
+
+      <div style={{ marginBottom: 24, height: 56 }} />
+
+      <SignatureBlock company={company} waybill={waybill} />
+
+      {/* Gold rule + footer */}
+      <div style={{ borderTop: '2px solid #D4A017', marginTop: 28 }} />
+      <div style={{ textAlign: 'center', fontSize: 10, color: '#333', marginTop: 10, lineHeight: 1.8 }}>
+        <div style={{ fontWeight: 600, fontSize: 11 }}>{company.fullName}</div>
+        <div>Ghana: {company.addressGhana}&nbsp;&nbsp;|&nbsp;&nbsp;Telephone: {company.phoneGhana}&nbsp;&nbsp;Mobile: {company.mobileGhana}</div>
+        <div>U.S.A: {company.addressUSA}&nbsp;&nbsp;|&nbsp;&nbsp;Telephone: {company.phoneUSA}</div>
+        <div>Email: {company.email}&nbsp;&nbsp;|&nbsp;&nbsp;Website: {company.website}</div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Dispatcher ───────────────────────────────────────────────────────────────
+
+function WaybillBody({ waybill, company, lines }: {
+  waybill: WaybillDetail
+  company: WaybillCompany
+  lines:   WaybillLine[]
+}) {
+  if (company.code === 'VSA') {
+    return <VSAWaybillBody waybill={waybill} company={company} lines={lines} />
+  }
+  return <VIAWaybillBody waybill={waybill} company={company} lines={lines} />
+}
+
+// ─── Detail view ──────────────────────────────────────────────────────────────
+
 function WaybillDetailView({ id }: { id: string }) {
   const router = useRouter()
-  const tweaks = useTweaksContext()
-  const layout = tweaks.waybillLayout ?? 'modern'
 
   const [waybill, setWaybill] = useState<WaybillDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -268,27 +353,25 @@ function WaybillDetailView({ id }: { id: string }) {
           </>
         }
         actions={
-          <>
-            <button className="btn btn-secondary btn-sm row gap-2" onClick={handlePrint}>
-              <Icon name="print" size={15} /> Print
-            </button>
-          </>
+          <button className="btn btn-secondary btn-sm row gap-2" onClick={handlePrint}>
+            <Icon name="print" size={15} /> Print
+          </button>
         }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'flex-start' }}>
-        {/* Left: paper preview */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, alignItems: 'flex-start' }}>
+
+        {/* Paper preview */}
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <div
             className="paper waybill-doc"
-            data-layout={layout}
-            style={{ width: 800, padding: 56, fontFamily: "'Inter', sans-serif", color: '#111', position: 'relative' }}
+            style={{ width: 794, minHeight: 1123, padding: '40px 64px 60px', boxSizing: 'border-box' }}
           >
-            <WaybillBody waybill={waybill} company={company} lines={lines} layout={layout} />
+            <WaybillBody waybill={waybill} company={company} lines={lines} />
           </div>
         </div>
 
-        {/* Right sidebar */}
+        {/* Sidebar */}
         <div className="col gap-4">
           <div className="card" style={{ padding: 20 }}>
             <SectionTitle>Waybill info</SectionTitle>
@@ -330,6 +413,8 @@ function WaybillDetailView({ id }: { id: string }) {
     </div>
   )
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function WaybillDetailPage() {
   const router = useRouter()

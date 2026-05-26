@@ -29,11 +29,13 @@ function serializeWaybillDetail(w: any) {
     id:              w.id,
     number:          w.number,
     companyId:       w.companyId,
-    date:            w.date.toISOString().slice(0, 10),
-    suppliedTo:      w.suppliedTo,
-    destinationCode: w.destinationCode,
-    driverName:      w.driverName,
-    generatedBy:     w.generatedBy,
+    date:             w.date.toISOString().slice(0, 10),
+    suppliedTo:       w.suppliedTo,
+    destinationCode:  w.destinationCode,
+    deliveryLocation: w.deliveryLocation ?? null,
+    driverName:       w.driverName,
+    carNumber:        w.carNumber        ?? null,
+    generatedBy:      w.generatedBy,
     generatedAt:     w.generatedAt.toISOString(),
     company: w.company ? {
       id:                    w.company.id,
@@ -52,6 +54,7 @@ function serializeWaybillDetail(w: any) {
       brandSubtitle:         w.company.brandSubtitle,
       authoriserName:        w.company.authoriserName,
       authoriserDesignation: w.company.authoriserDesignation,
+      logoUrl:               w.company.logoUrl ?? null,
     } : null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     lines: (w.movements ?? []).map((m: any) => ({
