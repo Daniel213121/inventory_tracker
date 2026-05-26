@@ -1,7 +1,7 @@
 import { Lettermark } from '../ui/Lettermark'
 
 interface CompanyOption {
-  id: string; name: string; code: string; tagline: string
+  id: string; name: string; code: string; tagline: string; logoUrl?: string | null
 }
 
 interface Props {
@@ -36,7 +36,7 @@ export function StockOutStep1Company({ companyId, companies, onSelect }: Props) 
               }}
             >
               <div className="row gap-3" style={{ marginBottom: 12 }}>
-                <Lettermark company={c} size={40} />
+                <Lettermark company={{ ...c, logoUrl: c.logoUrl }} size={40} />
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
                   <div className="muted" style={{ fontSize: 12 }}>

@@ -24,7 +24,7 @@ function StockOutForm() {
   const isStepper    = tweaks.stockOutFlow === 'stepper'
   const preItemId    = searchParams.get('item') ?? ''
 
-  const [companies,   setCompanies]   = useState<{ id: string; name: string; code: string; tagline: string; waybillSequence: number }[]>([])
+  const [companies,   setCompanies]   = useState<{ id: string; name: string; code: string; tagline: string; waybillSequence: number; logoUrl: string | null }[]>([])
   const [step,        setStep]        = useState(1)
   const [companyId,   setCompanyId]   = useState('')
   const [lines,       setLines]       = useState<Line[]>([])
@@ -38,7 +38,7 @@ function StockOutForm() {
 
   useEffect(() => {
     listCompanies().then(cos => {
-      setCompanies(cos.map(c => ({ id: c.id, name: c.name, code: c.code, tagline: c.tagline, waybillSequence: c.waybillSequence })))
+      setCompanies(cos.map(c => ({ id: c.id, name: c.name, code: c.code, tagline: c.tagline, waybillSequence: c.waybillSequence, logoUrl: c.logoUrl ?? null })))
       if (cos.length > 0) setCompanyId(cos[0].id)
     })
   }, [])
