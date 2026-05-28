@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice #INV-2026-0142</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      color: #111;
+      background: #fff;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
+    .company-name { font-size: 22px; font-weight: 700; color: #1E3A5F; }
+    .company-sub  { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .invoice-label { font-size: 28px; font-weight: 700; color: #2563EB; text-align: right; }
+    .invoice-num   { font-size: 13px; color: #6b7280; text-align: right; margin-top: 4px; }
+
+    /* Meta block */
+    .meta { display: flex; gap: 48px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid #e5e7eb; }
+    .meta-block label { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+    .meta-block span  { font-size: 13px; color: #111; font-weight: 500; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+    thead th {
+      background: #1E3A5F;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    thead th:last-child { text-align: right; }
+    tbody td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    tbody tr:nth-child(even) td { background: #f9fafb; }
+    tbody td:last-child { text-align: right; font-weight: 600; }
+    .item-name  { font-weight: 600; }
+    .item-model { font-size: 11px; color: #6b7280; margin-top: 2px; }
+
+    /* Totals */
+    .totals { display: flex; justify-content: flex-end; margin-bottom: 32px; }
+    .totals-box { width: 260px; }
+    .totals-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+    .totals-row.grand { font-size: 15px; font-weight: 700; color: #1E3A5F; border-bottom: none; padding-top: 10px; }
+
+    /* Footer */
+    .footer { font-size: 11px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 16px; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="company-name">Persol Systems Ltd</div>
+      <div class="company-sub">14 Independence Ave, Accra, Ghana</div>
+      <div class="company-sub">Tel: +233 30 291 4400 · info@persol.com.gh</div>
+    </div>
+    <div>
+      <div class="invoice-label">INVOICE</div>
+      <div class="invoice-num">INV-2026-0142</div>
+    </div>
+  </div>
+
+  <!-- Meta -->
+  <div class="meta">
+    <div class="meta-block">
+      <label>Invoice Date</label>
+      <span>26 May 2026</span>
+    </div>
+    <div class="meta-block">
+      <label>Due Date</label>
+      <span>25 June 2026</span>
+    </div>
+    <div class="meta-block">
+      <label>Bill To</label>
+      <span>VSA × VIA Ltd<br>Accra Business Centre, Block C</span>
+    </div>
+    <div class="meta-block">
+      <label>Payment Terms</label>
+      <span>Net 30</span>
+    </div>
+  </div>
+
+  <!-- Line items -->
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Description</th>
+        <th>Brand</th>
+        <th>Model / Part No.</th>
+        <th>Serial Number(s)</th>
+        <th>Condition</th>
+        <th>Qty</th>
+        <th>Unit Price</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>
+          <div class="item-name">Laptop Computer</div>
+          <div class="item-model">14-inch, M3 chip, 16GB RAM, 512GB SSD</div>
+        </td>
+        <td>Apple</td>
+        <td>MTLA3LL/A</td>
+        <td class="item-model">APL-MBP-001<br>APL-MBP-002<br>APL-MBP-003</td>
+        <td>NEW</td>
+        <td>3</td>
+        <td>$1,999.00</td>
+        <td>$5,997.00</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>
+          <div class="item-name">27" USB-C Monitor</div>
+          <div class="item-model">QHD 2560x1440, 60Hz, IPS</div>
+        </td>
+        <td>Dell</td>
+        <td>S2722DC</td>
+        <td class="item-model">DL-MON-S2722-001<br>DL-MON-S2722-002<br>DL-MON-S2722-003<br>DL-MON-S2722-004<br>DL-MON-S2722-005</td>
+        <td>NEW</td>
+        <td>5</td>
+        <td>$349.00</td>
+        <td>$1,745.00</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>
+          <div class="item-name">Wireless Keyboard &amp; Mouse Combo</div>
+          <div class="item-model">MK540 Advanced, 2.4GHz</div>
+        </td>
+        <td>Logitech</td>
+        <td>MK540 Advanced</td>
+        <td class="item-model">—</td>
+        <td>NEW</td>
+        <td>10</td>
+        <td>$59.99</td>
+        <td>$599.90</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>
+          <div class="item-name">2.5" SATA III SSD</div>
+          <div class="item-model">870 EVO Series, 1TB</div>
+        </td>
+        <td>Samsung</td>
+        <td>MZ-77E1T0B/AM</td>
+        <td class="item-model">SAM-SSD-870-001<br>SAM-SSD-870-002<br>SAM-SSD-870-003<br>SAM-SSD-870-004<br>SAM-SSD-870-005<br>SAM-SSD-870-006<br>SAM-SSD-870-007<br>SAM-SSD-870-008</td>
+        <td>NEW</td>
+        <td>8</td>
+        <td>$89.99</td>
+        <td>$719.92</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>
+          <div class="item-name">8-Port Gigabit Network Switch</div>
+          <div class="item-model">Unmanaged, Desktop</div>
+        </td>
+        <td>TP-Link</td>
+        <td>TL-SG108</td>
+        <td class="item-model">—</td>
+        <td>NEW</td>
+        <td>4</td>
+        <td>$24.99</td>
+        <td>$99.96</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>
+          <div class="item-name">USB-C Docking Station</div>
+          <div class="item-model">14-in-1, 4K HDMI, 100W PD</div>
+        </td>
+        <td>Anker</td>
+        <td>A8396</td>
+        <td class="item-model">ANK-DOCK-A8396-001<br>ANK-DOCK-A8396-002<br>ANK-DOCK-A8396-003<br>ANK-DOCK-A8396-004<br>ANK-DOCK-A8396-005<br>ANK-DOCK-A8396-006</td>
+        <td>NEW</td>
+        <td>6</td>
+        <td>$79.99</td>
+        <td>$479.94</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>
+          <div class="item-name">Inkjet Printer</div>
+          <div class="item-model">All-in-One, Wi-Fi, Duplex</div>
+        </td>
+        <td>HP</td>
+        <td>DeskJet 4155e</td>
+        <td class="item-model">HP-PRN-4155-001<br>HP-PRN-4155-002</td>
+        <td>NEW</td>
+        <td>2</td>
+        <td>$114.99</td>
+        <td>$229.98</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Totals -->
+  <div class="totals">
+    <div class="totals-box">
+      <div class="totals-row"><span>Subtotal</span><span>$9,871.70</span></div>
+      <div class="totals-row"><span>VAT (15%)</span><span>$1,480.76</span></div>
+      <div class="totals-row"><span>Shipping</span><span>$250.00</span></div>
+      <div class="totals-row grand"><span>TOTAL DUE</span><span>$11,602.46</span></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Payment due within 30 days. Please reference invoice number INV-2026-0142 on all payments.<br>
+    Bank: GCB Bank · Account: 1234567890 · Branch: Accra Main
+  </div>
+
+</body>
+</html>

@@ -133,6 +133,12 @@ function InventoryContent() {
               Import Excel
             </button>
             <button
+              className="btn btn-secondary btn-sm row gap-2"
+              onClick={() => router.push('/inventory/scan')}
+            >
+              Scan Invoice
+            </button>
+            <button
               className="btn btn-primary btn-sm row gap-2"
               onClick={() => router.push('/inventory/add')}
             >
