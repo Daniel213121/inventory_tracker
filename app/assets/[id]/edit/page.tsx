@@ -1,21 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { toast }       from 'sonner'
-import { AppShell }    from '../../../components/layout/AppShell'
-import { PageHeader }  from '../../../components/ui/PageHeader'
-import { SectionTitle } from '../../../components/ui/SectionTitle'
-import { FormRow }     from '../../../components/ui/FormRow'
-import { Icon }        from '../../../components/icons/Icon'
-import { Loading }     from '../../../components/ui/Loading'
+import { AppShell }    from '../../../../components/layout/AppShell'
+import { PageHeader }  from '../../../../components/ui/PageHeader'
+import { SectionTitle } from '../../../../components/ui/SectionTitle'
+import { FormRow }     from '../../../../components/ui/FormRow'
+import { Icon }        from '../../../../components/icons/Icon'
+import { Loading }     from '../../../../components/ui/Loading'
 import {
-  ASSET_TYPE_LABEL, ASSET_CONDITION_LABEL,
-} from '../../../lib/data'
-import { createAsset, listAssets } from '../../../app/actions/assets'
-import { listCompanies, listBranches, createBranch } from '../../../app/actions/settings'
-import { OS_OPTIONS } from '../../../lib/os-options'
-import type { AssetType, AssetCondition, Company, Branch } from '../../../lib/types'
+  ASSET_TYPE_LABEL, ASSET_CONDITION_LABEL, ASSET_STATUS_LABEL,
+} from '../../../../lib/data'
+import { getAsset, updateAsset } from '../../../../app/actions/assets'
+import { listCompanies, listBranches, createBranch } from '../../../../app/actions/settings'
+import { OS_OPTIONS } from '../../../../lib/os-options'
+import type { AssetType, AssetCondition, AssetStatus, Asset, Company, Branch } from '../../../../lib/types'
 
 // ─── Software chip ────────────────────────────────────────────────────────
 
@@ -37,46 +37,43 @@ function SoftwareChip({ label, onRemove }: { label: string; onRemove?: () => voi
   )
 }
 
-const TYPE_CODE: Record<AssetType, string> = {
-  LAPTOP: 'LT', PHONE: 'PH', TABLET: 'TB', MONITOR: 'MN', OTHER: 'OT',
-}
-
-const COND_OPTIONS: AssetCondition[] = ['NEW', 'GOOD', 'FAIR', 'DAMAGED']
+const COND_OPTIONS: AssetCondition[] = ['NEW', 'GOOD', 'FAIR', 'DAMAGED', 'BEYOND_REPAIR']
+const STATUS_OPTIONS: AssetStatus[]  = ['AVAILABLE', 'ASSIGNED', 'UNDER_REPAIR', 'RETIRED']
 
 // ─── Content ──────────────────────────────────────────────────────────────
 
-function AddAssetContent() {
+function EditAssetContent({ id }: { id: string }) {
   const router = useRouter()
+  const [asset, setAsset]     = useState<Asset | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [branches, setBranches]   = useState<Branch[]>([])
 
   const [companyId, setCompanyId] = useState('')
   const [branchId, setBranchId]   = useState('')
-  const [type, setType]           = useState<AssetType | ''>('')
+  const [type, setType]           = useState<AssetType>('LAPTOP')
   const [assetTag, setAssetTag]   = useState('')
   const [brand, setBrand]         = useState('')
   const [model, setModel]         = useState('')
   const [serial, setSerial]       = useState('')
-  const [condition, setCondition] = useState<AssetCondition | ''>('')
+  const [condition, setCondition] = useState<AssetCondition>('GOOD')
+  const [status, setStatus]       = useState<AssetStatus>('AVAILABLE')
   const [processor, setProcessor] = useState('')
   const [ram, setRam]             = useState('')
   const [storage, setStorage]     = useState('')
   const [os, setOs]               = useState('')
-  const [software, setSoftware]   = useState<string[]>(['Microsoft 365', 'Sophos Endpoint'])
+  const [software, setSoftware]   = useState<string[]>([])
   const [swInput, setSwInput]     = useState('')
-  const [purchaseDate, setPurchaseDate]   = useState('')
-  const [purchasePrice, setPurchasePrice] = useState('')
+  const [purchaseDate, setPurchaseDate]     = useState('')
+  const [purchasePrice, setPurchasePrice]   = useState('')
   const [warrantyExpiry, setWarrantyExpiry] = useState('')
   const [notes, setNotes]         = useState('')
   const [saving, setSaving]       = useState(false)
 
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [branches, setBranches]   = useState<Branch[]>([])
-  const [existingCount, setExistingCount] = useState(0)
-
   const [isAddingBranch, setIsAddingBranch] = useState(false)
   const [newBranchName, setNewBranchName]   = useState('')
   const [branchSaving, setBranchSaving]     = useState(false)
-
-  useEffect(() => { setBranchId('') }, [companyId])
 
   useEffect(() => {
     listCompanies().then(setCompanies)
@@ -85,18 +82,6 @@ function AddAssetContent() {
   useEffect(() => {
     listBranches(companyId || undefined).then(setBranches)
   }, [companyId])
-
-  useEffect(() => {
-    if (!companyId || !type) { setExistingCount(0); return }
-    listAssets({ companyId, type, pageSize: 1 }).then(r => setExistingCount(r.total))
-  }, [companyId, type])
-
-  const previewTag = (() => {
-    if (!companyId || !type) return '—'
-    const co = companies.find(c => c.id === companyId)
-    if (!co) return '—'
-    return `${co.code}-${TYPE_CODE[type]}-${String(existingCount + 1).padStart(3, '0')}`
-  })()
 
   function handleBranchChange(value: string) {
     if (value === '__add_new__') { setIsAddingBranch(true); return }
@@ -120,6 +105,35 @@ function AddAssetContent() {
     }
   }
 
+  useEffect(() => {
+    setLoading(true)
+    getAsset(id).then(a => {
+      if (a) {
+        const ax = a as Asset
+        setAsset(ax)
+        setCompanyId(ax.companyId)
+        setBranchId(ax.branchId)
+        setType(ax.type)
+        setAssetTag(ax.assetTag)
+        setBrand(ax.brand)
+        setModel(ax.model)
+        setSerial(ax.serial)
+        setCondition(ax.condition)
+        setStatus(ax.status)
+        setProcessor(ax.processor ?? '')
+        setRam(ax.ram ?? '')
+        setStorage(ax.storage ?? '')
+        setOs(ax.operatingSystem ?? '')
+        setSoftware(ax.software)
+        setPurchaseDate(ax.purchaseDate ?? '')
+        setPurchasePrice(ax.purchasePrice?.toString() ?? '')
+        setWarrantyExpiry(ax.warrantyExpiry ?? '')
+        setNotes(ax.notes ?? '')
+      }
+      setLoading(false)
+    })
+  }, [id])
+
   function addSoftware() {
     const trimmed = swInput.trim()
     if (trimmed && !software.includes(trimmed)) setSoftware(prev => [...prev, trimmed])
@@ -130,21 +144,20 @@ function AddAssetContent() {
     e.preventDefault()
     setSaving(true)
     try {
-      const asset = await createAsset({
-        companyId, branchId, type: type as AssetType, assetTag, brand, model, serial,
-        condition: condition as AssetCondition,
-        processor: processor || undefined,
-        ram: ram || undefined,
-        storage: storage || undefined,
-        operatingSystem: os || undefined,
+      await updateAsset(id, {
+        companyId, branchId, type, assetTag, brand, model, serial, condition, status,
+        processor: processor || null,
+        ram: ram || null,
+        storage: storage || null,
+        operatingSystem: os || null,
         software,
-        purchaseDate: purchaseDate || undefined,
-        purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
-        warrantyExpiry: warrantyExpiry || undefined,
-        notes: notes || undefined,
+        purchaseDate: purchaseDate || null,
+        purchasePrice: purchasePrice ? parseFloat(purchasePrice) : null,
+        warrantyExpiry: warrantyExpiry || null,
+        notes: notes || null,
       })
-      toast.success(`Asset ${assetTag} added`)
-      router.push(`/assets/${asset.id}`)
+      toast.success(`Asset ${assetTag} updated`)
+      router.push(`/assets/${id}`)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -154,17 +167,22 @@ function AddAssetContent() {
 
   const availBranches = branches
 
+  if (loading || !asset) return <Loading />
+
   return (
     <div>
       <PageHeader
-        title="Add New Asset"
-        subtitle="Register a new laptop, phone, tablet or monitor."
+        title={`Edit ${asset.brand} ${asset.model}`}
+        subtitle="Update asset details and status."
         breadcrumb={
           <>
             <button className="btn btn-ghost btn-sm" style={{ padding: 0 }}
               onClick={() => router.push('/assets')}>Assets</button>
             <Icon name="chevronRight" size={14} stroke="var(--text-2)" />
-            <span>Add new</span>
+            <button className="btn btn-ghost btn-sm" style={{ padding: 0 }}
+              onClick={() => router.push(`/assets/${id}`)}>{asset.assetTag}</button>
+            <Icon name="chevronRight" size={14} stroke="var(--text-2)" />
+            <span>Edit</span>
           </>
         }
       />
@@ -179,7 +197,7 @@ function AddAssetContent() {
 
               <FormRow label="Company" required>
                 <select className="select" value={companyId}
-                  onChange={e => setCompanyId(e.target.value)} required>
+                  onChange={e => { setCompanyId(e.target.value); setBranchId('') }} required>
                   <option value="">Select company…</option>
                   {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -209,7 +227,6 @@ function AddAssetContent() {
               <FormRow label="Type" required>
                 <select className="select" value={type}
                   onChange={e => setType(e.target.value as AssetType)} required>
-                  <option value="">Select type…</option>
                   {(Object.entries(ASSET_TYPE_LABEL) as [AssetType, string][]).map(([v, l]) =>
                     <option key={v} value={v}>{l}</option>)}
                 </select>
@@ -217,7 +234,7 @@ function AddAssetContent() {
 
               <FormRow label="Asset Tag" required hint="Must be unique across the system">
                 <input className="input t-mono" value={assetTag} onChange={e => setAssetTag(e.target.value.toUpperCase())}
-                  placeholder={previewTag !== '—' ? previewTag : 'e.g. VIA-LT-001'} required />
+                  placeholder="VIA-LT-001" required />
               </FormRow>
 
               <FormRow label="Brand" required>
@@ -238,9 +255,16 @@ function AddAssetContent() {
               <FormRow label="Condition" required>
                 <select className="select" value={condition}
                   onChange={e => setCondition(e.target.value as AssetCondition)} required>
-                  <option value="">Select condition…</option>
                   {COND_OPTIONS.map(v =>
                     <option key={v} value={v}>{ASSET_CONDITION_LABEL[v]}</option>)}
+                </select>
+              </FormRow>
+
+              <FormRow label="Status" required>
+                <select className="select" value={status}
+                  onChange={e => setStatus(e.target.value as AssetStatus)} required>
+                  {STATUS_OPTIONS.map(v =>
+                    <option key={v} value={v}>{ASSET_STATUS_LABEL[v]}</option>)}
                 </select>
               </FormRow>
 
@@ -268,7 +292,7 @@ function AddAssetContent() {
               </FormRow>
 
               <FormRow label="Operating System">
-                {type && OS_OPTIONS[type].length > 0 ? (
+                {OS_OPTIONS[type].length > 0 ? (
                   <select className="select" value={os} onChange={e => setOs(e.target.value)}>
                     <option value="">Select OS…</option>
                     {OS_OPTIONS[type].map(o => <option key={o} value={o}>{o}</option>)}
@@ -335,11 +359,11 @@ function AddAssetContent() {
           {/* Actions */}
           <div className="row gap-2" style={{ justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-secondary"
-              onClick={() => router.push('/assets')}>
+              onClick={() => router.push(`/assets/${id}`)}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving…' : 'Add Asset'}
+              {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
 
@@ -351,8 +375,9 @@ function AddAssetContent() {
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 
-export default function AddAssetPage() {
+export default function EditAssetPage() {
   const router = useRouter()
+  const params = useParams<{ id: string }>()
   const [user, setUser] = useState<{ id: string; name: string; email: string } | null>(null)
 
   useEffect(() => {
@@ -365,7 +390,7 @@ export default function AddAssetPage() {
 
   return (
     <AppShell user={user} onLogout={() => { localStorage.removeItem('auth_user'); router.push('/login') }}>
-      <AddAssetContent />
+      <EditAssetContent id={params.id} />
     </AppShell>
   )
 }

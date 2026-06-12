@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AppShell }    from '../../components/layout/AppShell'
 import { PageHeader }  from '../../components/ui/PageHeader'
@@ -14,13 +14,14 @@ import {
   PaginationLink, PaginationNext, PaginationPrevious,
 } from '../../components/ui/pagination'
 import {
-  ASSETS, BRANCHES, EMPLOYEES,
-  ASSET_ASSIGNMENTS, BRANCH_BY_ID, EMPLOYEE_BY_ID,
-  COMPANIES, COMPANY_BY_ID,
   ASSET_TYPE_LABEL, ASSET_TYPE_ICON,
-  ASSET_STATUS_LABEL, ASSET_CONDITION_LABEL,
+  ASSET_STATUS_LABEL,
 } from '../../lib/data'
-import type { AssetType, AssetStatus, AssetCondition } from '../../lib/types'
+import { listAssets } from '../../app/actions/assets'
+import { listEmployees } from '../../app/actions/employees'
+import { listCompanies, listBranches } from '../../app/actions/settings'
+import type { AssetType, AssetStatus, Asset, Employee, Branch } from '../../lib/types'
+import type { Company } from '../../lib/types'
 
 const PAGE_SIZE = 12
 
@@ -47,14 +48,6 @@ function AssetStatusBadge({ value }: { value: AssetStatus }) {
   return <KindBadge kind={map[value]}>{ASSET_STATUS_LABEL[value]}</KindBadge>
 }
 
-function currentEmployeeFor(assetId: string) {
-  return ASSET_ASSIGNMENTS.find(a => a.assetId === assetId && a.returnedAt == null)
-}
-
-function branchesFor(companyId: string) {
-  return companyId ? BRANCHES.filter(b => b.companyId === companyId) : BRANCHES
-}
-
 // ─── Content ──────────────────────────────────────────────────────────────
 
 function AssetsContent() {
@@ -67,32 +60,67 @@ function AssetsContent() {
   const [status, setStatus]         = useState('')
   const [page, setPage]             = useState(1)
 
+  const [loading, setLoading]       = useState(true)
+  const [assets, setAssets]         = useState<Asset[]>([])
+  const [total, setTotal]           = useState(0)
+  const [pages, setPages]           = useState(1)
+  const [assigned, setAssigned]     = useState(0)
+  const [available, setAvailable]  = useState(0)
+  const [companies, setCompanies]   = useState<Company[]>([])
+  const [branches, setBranches]     = useState<Branch[]>([])
+  const [employees, setEmployees]   = useState<Employee[]>([])
+
   useEffect(() => { setBranch(''); setPage(1) }, [company])
 
-  const filtered = useMemo(() => {
-    const lq = q.toLowerCase()
-    return ASSETS.filter(a => {
-      if (company && a.companyId !== company) return false
-      if (branch  && a.branchId  !== branch)  return false
-      if (type    && a.type      !== type)     return false
-      if (status  && a.status    !== status)   return false
-      if (q) {
-        const cur   = currentEmployeeFor(a.id)
-        const emp   = cur ? EMPLOYEE_BY_ID[cur.employeeId] : null
-        const haystack = [a.assetTag, a.brand, a.model, a.serial, emp?.name ?? ''].join(' ').toLowerCase()
-        if (!haystack.includes(lq)) return false
-      }
-      return true
+  useEffect(() => {
+    listCompanies().then(setCompanies)
+    listEmployees({ pageSize: 1000 }).then(r => setEmployees(r.items as unknown as Employee[]))
+  }, [])
+
+  useEffect(() => {
+    listBranches(company || undefined).then(setBranches)
+  }, [company])
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([
+      listAssets({
+        companyId: company || undefined,
+        branchId:  branch  || undefined,
+        type:      type    || undefined,
+        status:    status  || undefined,
+        search:    q       || undefined,
+        page, pageSize: PAGE_SIZE,
+      }),
+      listAssets({ status: 'ASSIGNED',  pageSize: 1 }),
+      listAssets({ status: 'AVAILABLE', pageSize: 1 }),
+    ]).then(([res, assignedRes, availableRes]) => {
+      setAssets(res.items as unknown as Asset[])
+      setTotal(res.total)
+      setPages(res.pages)
+      setAssigned(assignedRes.total)
+      setAvailable(availableRes.total)
+      setLoading(false)
     })
-  }, [q, company, branch, type, status])
+  }, [q, company, branch, type, status, page])
 
-  const total  = filtered.length
-  const pages  = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const paged  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const assigned  = ASSETS.filter(a => a.status === 'ASSIGNED').length
-  const available = ASSETS.filter(a => a.status === 'AVAILABLE').length
+  function currentEmployeeFor(assetId: string) {
+    return employees.find(e =>
+      (e as unknown as { assetAssignments?: { assetId: string; returnedAt: string | null }[] })
+        .assetAssignments?.some(a => a.assetId === assetId && a.returnedAt == null)
+    )
+  }
 
-  const availBranches = branchesFor(company)
+  function companyById(id: string) {
+    return companies.find(c => c.id === id)
+  }
+
+  function branchNameById(id: string) {
+    return branches.find(b => b.id === id)?.name ?? ''
+  }
+
+  const paged = assets
+  const availBranches = branches
 
   return (
     <div>
@@ -123,7 +151,7 @@ function AssetsContent() {
             <select className="select" style={{ width: 160 }}
               value={company} onChange={e => { setCompany(e.target.value); setPage(1) }}>
               <option value="">All companies</option>
-              {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
+              {companies.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
             </select>
             <select className="select" style={{ width: 160 }}
               value={branch} onChange={e => { setBranch(e.target.value); setPage(1) }}>
@@ -163,18 +191,24 @@ function AssetsContent() {
             </tr>
           </thead>
           <tbody>
-            {paged.length === 0 && (
+            {loading && (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 40, color: 'var(--text-2)' }}>
+                  Loading…
+                </td>
+              </tr>
+            )}
+            {!loading && paged.length === 0 && (
               <tr>
                 <td colSpan={9} style={{ textAlign: 'center', padding: 40, color: 'var(--text-2)' }}>
                   No assets match your filters
                 </td>
               </tr>
             )}
-            {paged.map(a => {
-              const cur = currentEmployeeFor(a.id)
-              const emp = cur ? EMPLOYEE_BY_ID[cur.employeeId] : null
-              const co  = COMPANY_BY_ID[a.companyId]
-              const branchName = BRANCH_BY_ID[a.branchId]?.name ?? ''
+            {!loading && paged.map(a => {
+              const emp = currentEmployeeFor(a.id)
+              const co  = companyById(a.companyId)
+              const branchName = branchNameById(a.branchId)
               const shortBranch = branchName.replace(/^(VSA|VIA)\s*[—-]\s*/i, '')
               return (
                 <tr key={a.id} onClick={() => router.push(`/assets/${a.id}`)}

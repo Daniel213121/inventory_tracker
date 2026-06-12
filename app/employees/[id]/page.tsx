@@ -14,15 +14,10 @@ import { Icon }         from '../../../components/icons/Icon'
 import { Loading }      from '../../../components/ui/Loading'
 import { fmtDate, fmtDateShort } from '../../../lib/utils'
 import {
-  EMPLOYEES, EMPLOYEE_BY_ID,
-  BRANCH_BY_ID,
-  ASSETS, ASSET_BY_ID,
-  ASSET_ASSIGNMENTS, ASSET_TRANSFERS,
-  COMPANY_BY_ID,
   ASSET_TYPE_LABEL, ASSET_TYPE_ICON,
-  TRANSFER_REASON_LABEL,
 } from '../../../lib/data'
-import type { AssetType } from '../../../lib/types'
+import { getEmployee, resignEmployee } from '../../../app/actions/employees'
+import type { AssetType, Employee, Company, Branch, Asset, AssetAssignment } from '../../../lib/types'
 
 // ─── Local helpers ────────────────────────────────────────────────────────
 
@@ -53,18 +48,14 @@ function KV({ label, children, mono, span }: {
   )
 }
 
-function employeeHistoryFor(employeeId: string) {
-  return ASSET_ASSIGNMENTS
-    .filter(a => a.employeeId === employeeId)
-    .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
-}
+type AssignmentWithAsset = AssetAssignment & { asset?: Asset }
 
 // ─── Resignation Modal ────────────────────────────────────────────────────
 
 interface ResignModalProps {
-  currentAssets: { assignment: typeof ASSET_ASSIGNMENTS[0]; asset: typeof ASSETS[0] }[]
+  currentAssets: { assignment: AssignmentWithAsset; asset: Asset }[]
   onClose: () => void
-  onConfirm: (date: string, notes: string) => void
+  onConfirm: (date: string) => void
 }
 
 function ResignModal({ currentAssets, onClose, onConfirm }: ResignModalProps) {
@@ -133,7 +124,7 @@ function ResignModal({ currentAssets, onClose, onConfirm }: ResignModalProps) {
           <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
           <button className="btn btn-danger"
             disabled={!resignDate || currentAssets.length > 0}
-            onClick={() => onConfirm(resignDate, resignNotes)}>
+            onClick={() => onConfirm(resignDate)}>
             Confirm Resignation
           </button>
         </div>
@@ -147,26 +138,46 @@ function ResignModal({ currentAssets, onClose, onConfirm }: ResignModalProps) {
 function EmployeeDetailContent({ id }: { id: string }) {
   const router = useRouter()
 
-  const e       = EMPLOYEE_BY_ID[id] ?? EMPLOYEES[0]
-  const co      = COMPANY_BY_ID[e.companyId]
-  const history = employeeHistoryFor(e.id)
+  type EmployeeDetail = Employee & {
+    company?: Company
+    branch?:  Branch
+    assetAssignments?: AssignmentWithAsset[]
+  }
 
-  const currentAssets = ASSET_ASSIGNMENTS
-    .filter(a => a.employeeId === e.id && a.returnedAt == null)
-    .map(a => ({ assignment: a, asset: ASSET_BY_ID[a.assetId] }))
-    .filter(x => x.asset != null) as { assignment: typeof ASSET_ASSIGNMENTS[0]; asset: typeof ASSETS[0] }[]
-
+  const [e, setE]             = useState<EmployeeDetail | null>(null)
+  const [loading, setLoading] = useState(true)
   const [showResignModal, setShowResignModal] = useState(false)
 
-  async function handleResign(resignDate: string, notes: string) {
+  useEffect(() => {
+    setLoading(true)
+    getEmployee(id).then(emp => {
+      setE(emp as unknown as EmployeeDetail | null)
+      setLoading(false)
+    })
+  }, [id])
+
+  if (loading) return <Loading />
+  if (!e) {
+    return (
+      <div style={{ padding: 40 }}>
+        <EmptyState icon="user" title="Employee not found"
+          message="This employee does not exist or may have been removed." />
+      </div>
+    )
+  }
+
+  const co      = e.company
+  const history = (e.assetAssignments ?? []).slice().sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
+
+  const currentAssets = (e.assetAssignments ?? [])
+    .filter(a => a.returnedAt == null)
+    .map(a => ({ assignment: a, asset: a.asset }))
+    .filter(x => x.asset != null) as { assignment: AssignmentWithAsset; asset: Asset }[]
+
+  async function handleResign(resignDate: string) {
     try {
-      const res = await fetch(`/api/employees/${e.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resignedAt: resignDate, notes }),
-      })
-      if (!res.ok) throw new Error('Failed to record resignation')
-      toast.success(`Resignation recorded for ${e.name}`)
+      await resignEmployee(e!.id, { resignedAt: resignDate })
+      toast.success(`Resignation recorded for ${e!.name}`)
       setShowResignModal(false)
       router.refresh()
     } catch (err: unknown) {
@@ -188,7 +199,8 @@ function EmployeeDetailContent({ id }: { id: string }) {
         }
         actions={
           <>
-            <button className="btn btn-secondary btn-sm row gap-2">
+            <button className="btn btn-secondary btn-sm row gap-2"
+              onClick={() => router.push(`/employees/${e.id}/edit`)}>
               <Icon name="edit" size={14} />Edit
             </button>
             {e.active && (
@@ -216,7 +228,7 @@ function EmployeeDetailContent({ id }: { id: string }) {
             <KV label="Company">
               {co && <CompanyChip code={co.code} name={co.name} />}
             </KV>
-            <KV label="Branch">{BRANCH_BY_ID[e.branchId]?.name}</KV>
+            <KV label="Branch">{e.branch?.name}</KV>
             <KV label="Job Title">{e.jobTitle}</KV>
             <KV label="Department">{e.department}</KV>
             <KV label="Employee ID" mono>{e.employeeId || null}</KV>
@@ -305,11 +317,8 @@ function EmployeeDetailContent({ id }: { id: string }) {
             </thead>
             <tbody>
               {history.map(h => {
-                const asset = ASSET_BY_ID[h.assetId]
+                const asset = h.asset
                 if (!asset) return null
-                const transfer = ASSET_TRANSFERS.find(
-                  t => t.assetId === h.assetId && t.fromEmployeeId === e.id
-                )
                 return (
                   <tr key={h.id}>
                     <td>
@@ -326,20 +335,10 @@ function EmployeeDetailContent({ id }: { id: string }) {
                         : <span className="badge badge-active">Current</span>}
                     </td>
                     <td style={{ fontSize: 13 }}>
-                      {transfer
-                        ? TRANSFER_REASON_LABEL[transfer.reason]
-                        : <span className="muted">—</span>}
+                      <span className="muted">—</span>
                     </td>
                     <td>
-                      {transfer ? (
-                        <button className="btn btn-ghost btn-sm t-mono"
-                          style={{ color: 'var(--secondary)', fontWeight: 500, fontSize: 13 }}
-                          onClick={() => router.push(`/assets/transfers/${transfer.id}`)}>
-                          {transfer.referenceNumber}
-                        </button>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
+                      <span className="muted">—</span>
                     </td>
                   </tr>
                 )

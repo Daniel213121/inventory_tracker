@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { AppShell }     from '../../../../components/layout/AppShell'
 import { PageHeader }   from '../../../../components/ui/PageHeader'
@@ -8,65 +8,47 @@ import { SectionTitle } from '../../../../components/ui/SectionTitle'
 import { KindBadge }    from '../../../../components/ui/badges'
 import { Icon }         from '../../../../components/icons/Icon'
 import { Loading }      from '../../../../components/ui/Loading'
+import { EmptyState }   from '../../../../components/ui/EmptyState'
 import { fmtDate, fmtWaybillDate } from '../../../../lib/utils'
 import {
-  ASSET_TRANSFERS, ASSET_TRANSFER_BY_ID,
-  ASSET_BY_ID, BRANCH_BY_ID, EMPLOYEE_BY_ID,
-  COMPANY_BY_ID, USERS,
   ASSET_TYPE_LABEL, ASSET_CONDITION_LABEL,
   TRANSFER_REASON_LABEL,
-  fmtCurrency,
 } from '../../../../lib/data'
-import type { TransferReason } from '../../../../lib/types'
+import { getAssetTransfer } from '../../../../app/actions/assets'
+import type { TransferReason, Asset, Employee, Company, AssetTransfer } from '../../../../lib/types'
+
+type TransferDetail = AssetTransfer & {
+  asset?:        Asset
+  company?:      Company
+  fromEmployee?: Employee | null
+  toEmployee?:   Employee | null
+}
 
 // ─── Logo ─────────────────────────────────────────────────────────────────
 
-function DocLogo({ company }: { company: { code: string; name: string; brandSubtitle: string } }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <svg width={62} height={46} viewBox="0 0 62 46" fill="none">
-        <path d="M2 2 L20 23 L2 44" stroke="#E89A2B" strokeWidth={4.5}
-          strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M16 2 L34 23 L16 44" stroke="#E89A2B" strokeWidth={4.5}
-          strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M30 2 L48 23 L30 44" stroke="#5A2F8E" strokeWidth={4.5}
-          strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <div style={{ lineHeight: 1.05 }}>
-        <div style={{ fontWeight: 800, fontSize: 38, color: '#5A2F8E', letterSpacing: '-0.01em' }}>
-          {company.code}
-        </div>
-        <div style={{
-          borderTop: '1.5px solid #D4A017', marginTop: 2, paddingTop: 3,
-          color: '#5A2F8E', fontSize: 10.5, fontWeight: 600,
-        }}>
-          {company.name}
-        </div>
-        <div style={{
-          color: '#5A2F8E', fontSize: 8.5, fontStyle: 'italic',
-          marginTop: 1, textAlign: 'right',
-        }}>
-          {company.brandSubtitle}
-        </div>
-      </div>
-    </div>
-  )
+function DocLogo({ company }: { company: { code: string; logoUrl?: string | null } }) {
+  if (company.logoUrl) {
+    return (
+      <img src={company.logoUrl} alt={company.code}
+        style={{ height: 46, width: 'auto', objectFit: 'contain' }} />
+    )
+  }
+  return <div style={{ fontSize: 36, fontWeight: 800, color: '#5A2F8E' }}>{company.code}</div>
 }
 
 // ─── Document ─────────────────────────────────────────────────────────────
 
 interface DocProps {
-  transferId: string
+  transfer: TransferDetail
 }
 
-function ChangeOfAssetDoc({ transferId }: DocProps) {
-  const transfer = ASSET_TRANSFER_BY_ID[transferId] ?? ASSET_TRANSFERS[0]
-  const asset    = ASSET_BY_ID[transfer.assetId]
-  const company  = COMPANY_BY_ID[transfer.companyId]
-  const fromEmp  = transfer.fromEmployeeId ? EMPLOYEE_BY_ID[transfer.fromEmployeeId] : null
-  const toEmp    = transfer.toEmployeeId   ? EMPLOYEE_BY_ID[transfer.toEmployeeId]   : null
+const ChangeOfAssetDoc = React.forwardRef<HTMLDivElement, DocProps>(function ChangeOfAssetDoc({ transfer }, ref) {
+  const asset    = transfer.asset
+  const company  = transfer.company
+  const fromEmp  = transfer.fromEmployee ?? null
+  const toEmp    = transfer.toEmployee   ?? null
 
-  const accent = company?.id === 'vsa' ? '#D4A017' : '#0EA5E9'
+  const accent = company?.code === 'VSA' ? '#D4A017' : '#0EA5E9'
   const purple = '#5A2F8E'
 
   function sectionLabel(text: string) {
@@ -98,7 +80,7 @@ function ChangeOfAssetDoc({ transferId }: DocProps) {
   const specs = [asset?.processor, asset?.ram, asset?.storage, asset?.operatingSystem].filter(Boolean)
 
   return (
-    <div className="paper" style={{
+    <div ref={ref} className="paper waybill-doc" style={{
       width: 794, minHeight: 1123, padding: 56,
       fontFamily: "'Inter', sans-serif", color: '#111', position: 'relative',
     }}>
@@ -137,13 +119,13 @@ function ChangeOfAssetDoc({ transferId }: DocProps) {
       {sectionLabel('Asset Details')}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 32, rowGap: 0 }}>
         {docKV('Asset Tag', asset?.assetTag, true)}
-        {docKV('Type', asset ? ASSET_TYPE_LABEL[asset.type] : undefined)}
+        {docKV('Type', asset ? ASSET_TYPE_LABEL[asset.type as keyof typeof ASSET_TYPE_LABEL] : undefined)}
         {docKV('Brand / Model', asset ? `${asset.brand} ${asset.model}` : undefined)}
         {docKV('Serial Number', asset?.serial, true)}
         {docKV('Condition at transfer',
           transfer.fromCondition
-            ? ASSET_CONDITION_LABEL[transfer.fromCondition]
-            : asset ? ASSET_CONDITION_LABEL[asset.condition] : undefined)}
+            ? ASSET_CONDITION_LABEL[transfer.fromCondition as keyof typeof ASSET_CONDITION_LABEL]
+            : asset ? ASSET_CONDITION_LABEL[asset.condition as keyof typeof ASSET_CONDITION_LABEL] : undefined)}
         {docKV('Purchase Date', asset?.purchaseDate ? fmtDate(asset.purchaseDate) : undefined)}
       </div>
 
@@ -175,7 +157,6 @@ function ChangeOfAssetDoc({ transferId }: DocProps) {
             {docKV('Department', fromEmp.department)}
             {docKV('Employee ID', fromEmp.employeeId, true)}
             {docKV('Company', company?.fullName)}
-            {docKV('Branch', BRANCH_BY_ID[fromEmp.branchId]?.name)}
           </div>
           <div style={{ marginTop: 8 }}>
             {docKV('Reason for transfer', TRANSFER_REASON_LABEL[transfer.reason as TransferReason])}
@@ -192,7 +173,7 @@ function ChangeOfAssetDoc({ transferId }: DocProps) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', marginTop: 8 }}>
             {docKV('Date returned', transfer.returnedAt ? fmtDate(transfer.returnedAt) : undefined)}
             {docKV('Condition returned',
-              transfer.fromCondition ? ASSET_CONDITION_LABEL[transfer.fromCondition] : undefined)}
+              transfer.fromCondition ? ASSET_CONDITION_LABEL[transfer.fromCondition as keyof typeof ASSET_CONDITION_LABEL] : undefined)}
           </div>
         </>
       ) : (
@@ -210,8 +191,7 @@ function ChangeOfAssetDoc({ transferId }: DocProps) {
             {docKV('Job Title', toEmp.jobTitle)}
             {docKV('Department', toEmp.department)}
             {docKV('Employee ID', toEmp.employeeId, true)}
-            {docKV('Company', COMPANY_BY_ID[toEmp.companyId]?.fullName)}
-            {docKV('Branch', BRANCH_BY_ID[toEmp.branchId]?.name)}
+            {docKV('Company', company?.fullName)}
           </div>
           <div style={{ marginTop: 8 }}>
             {docKV('Date assigned', transfer.assignedAt ? fmtDate(transfer.assignedAt) : undefined)}
@@ -227,9 +207,8 @@ function ChangeOfAssetDoc({ transferId }: DocProps) {
 
       {/* 7. Authorisation */}
       {(() => {
-        const processedByUser = USERS.find(u => u.id === transfer.processedBy)
         const sigBlocks = [
-          { label: 'Processed by', name: processedByUser?.name ?? '—', role: 'IT Staff' },
+          { label: 'Processed by', name: transfer.processedBy ?? '—', role: 'IT Staff' },
           { label: 'Previous holder', name: fromEmp?.name ?? '—', role: fromEmp?.jobTitle ?? '' },
           { label: 'Authorised by', name: transfer.authorisedBy, role: 'Manager' },
         ]
@@ -268,7 +247,8 @@ function ChangeOfAssetDoc({ transferId }: DocProps) {
 
       {/* 8. Footer */}
       <div style={{
-        borderTop: `2px solid ${accent}`, paddingTop: 8, marginTop: 36,
+        borderTop: `2px solid ${accent}`, paddingTop: 8,
+        position: 'absolute', left: 0, right: 0, bottom: 32,
         textAlign: 'center', fontSize: 10, lineHeight: 1.55, color: '#111',
       }}>
         <div style={{ fontWeight: 700, fontStyle: 'italic', fontSize: 11.5, marginBottom: 4, color: purple }}>
@@ -288,18 +268,76 @@ function ChangeOfAssetDoc({ transferId }: DocProps) {
       </div>
     </div>
   )
-}
+})
 
 // ─── Content ──────────────────────────────────────────────────────────────
 
 function TransferDocContent({ id }: { id: string }) {
   const router   = useRouter()
-  const transfer = ASSET_TRANSFER_BY_ID[id] ?? ASSET_TRANSFERS[0]
-  const asset    = ASSET_BY_ID[transfer.assetId]
-  const company  = COMPANY_BY_ID[transfer.companyId]
-  const fromEmp  = transfer.fromEmployeeId ? EMPLOYEE_BY_ID[transfer.fromEmployeeId] : null
-  const toEmp    = transfer.toEmployeeId   ? EMPLOYEE_BY_ID[transfer.toEmployeeId]   : null
-  const processedByUser = USERS.find(u => u.id === transfer.processedBy)
+  const docRef = useRef<HTMLDivElement>(null)
+  const [transfer, setTransfer] = useState<TransferDetail | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [downloading, setDownloading] = useState(false)
+
+  async function buildPdf() {
+    if (!docRef.current) return null
+    const { default: html2canvas } = await import('html2canvas')
+    const { jsPDF } = await import('jspdf')
+    const canvas = await html2canvas(docRef.current, { scale: 2, useCORS: true })
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const pdfHeight = pdf.internal.pageSize.getHeight()
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
+    return pdf
+  }
+
+  async function handleDownloadPdf() {
+    setDownloading(true)
+    try {
+      const pdf = await buildPdf()
+      if (!pdf) return
+      pdf.save(`${transfer?.referenceNumber || 'change-of-asset'}.pdf`)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  async function handlePrint() {
+    setDownloading(true)
+    try {
+      const pdf = await buildPdf()
+      if (!pdf) return
+      pdf.autoPrint()
+      window.open(pdf.output('bloburl'), '_blank')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  useEffect(() => {
+    setLoading(true)
+    getAssetTransfer(id).then(t => {
+      setTransfer(t as unknown as TransferDetail | null)
+      setLoading(false)
+    })
+  }, [id])
+
+  if (loading) return <Loading />
+  if (!transfer) {
+    return (
+      <div style={{ padding: 40 }}>
+        <EmptyState icon="document" title="Transfer not found"
+          message="This transfer record does not exist or may have been removed." />
+      </div>
+    )
+  }
+
+  const asset   = transfer.asset
+  const company = transfer.company
+  const fromEmp = transfer.fromEmployee ?? null
+  const toEmp   = transfer.toEmployee   ?? null
+  const processedByUser = { name: transfer.processedBy }
 
   return (
     <div>
@@ -320,11 +358,11 @@ function TransferDocContent({ id }: { id: string }) {
         }
         actions={
           <>
-            <button className="btn btn-secondary btn-sm row gap-2" onClick={() => window.print()}>
+            <button className="btn btn-secondary btn-sm row gap-2" onClick={handlePrint} disabled={downloading}>
               <Icon name="print" size={14} />Print
             </button>
-            <button className="btn btn-primary btn-sm row gap-2">
-              <Icon name="download" size={14} />Download PDF
+            <button className="btn btn-primary btn-sm row gap-2" onClick={handleDownloadPdf} disabled={downloading}>
+              <Icon name="download" size={14} />{downloading ? 'Generating…' : 'Download PDF'}
             </button>
           </>
         }
@@ -334,7 +372,7 @@ function TransferDocContent({ id }: { id: string }) {
 
         {/* Left — paper preview */}
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <ChangeOfAssetDoc transferId={id} />
+          <ChangeOfAssetDoc transfer={transfer} ref={docRef} />
         </div>
 
         {/* Right sidebar */}
@@ -371,11 +409,12 @@ function TransferDocContent({ id }: { id: string }) {
             <SectionTitle>Document</SectionTitle>
             <div className="col gap-2">
               <button className="btn btn-secondary row gap-2" style={{ justifyContent: 'flex-start' }}
-                onClick={() => window.print()}>
+                onClick={handlePrint} disabled={downloading}>
                 <Icon name="print" size={14} />Print document
               </button>
-              <button className="btn btn-secondary row gap-2" style={{ justifyContent: 'flex-start' }}>
-                <Icon name="download" size={14} />Download PDF
+              <button className="btn btn-secondary row gap-2" style={{ justifyContent: 'flex-start' }}
+                onClick={handleDownloadPdf} disabled={downloading}>
+                <Icon name="download" size={14} />{downloading ? 'Generating…' : 'Download PDF'}
               </button>
               <button className="btn btn-secondary row gap-2" style={{ justifyContent: 'flex-start' }}
                 onClick={() => router.push(`/assets/${asset?.id}`)}>

@@ -12,14 +12,13 @@ import { Icon }         from '../../../components/icons/Icon'
 import { Loading }      from '../../../components/ui/Loading'
 import { fmtDate }      from '../../../lib/utils'
 import {
-  ASSETS, ASSET_BY_ID, BRANCHES, BRANCH_BY_ID,
-  EMPLOYEES, EMPLOYEE_BY_ID,
-  ASSET_ASSIGNMENTS, COMPANY_BY_ID,
   ASSET_TYPE_LABEL, ASSET_TYPE_ICON,
   ASSET_STATUS_LABEL, ASSET_CONDITION_LABEL,
+  TRANSFER_REASON_LABEL,
   fmtCurrency, daysBetween,
 } from '../../../lib/data'
-import type { AssetType, AssetStatus, AssetCondition } from '../../../lib/types'
+import { getAsset } from '../../../app/actions/assets'
+import type { AssetType, AssetStatus, AssetCondition, Asset, AssetAssignment, AssetTransfer, Employee, Company, Branch, TransferReason } from '../../../lib/types'
 
 // ─── Local helpers ────────────────────────────────────────────────────────
 
@@ -85,25 +84,45 @@ function NameAvatar({ name, size = 32 }: { name: string; size?: number }) {
   )
 }
 
-function currentEmployeeFor(assetId: string) {
-  return ASSET_ASSIGNMENTS.find(a => a.assetId === assetId && a.returnedAt == null)
-}
-
-function historyFor(assetId: string) {
-  return ASSET_ASSIGNMENTS
-    .filter(a => a.assetId === assetId)
-    .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
+type AssetDetail = Asset & {
+  company?: Company
+  branch?:  Branch
+  assignments?: (AssetAssignment & { employee?: Employee })[]
+  transfers?: AssetTransfer[]
 }
 
 // ─── Content ──────────────────────────────────────────────────────────────
 
 function AssetDetailContent({ id }: { id: string }) {
   const router = useRouter()
-  const asset  = ASSET_BY_ID[id] ?? ASSETS[0]
-  const co     = COMPANY_BY_ID[asset.companyId]
-  const cur    = currentEmployeeFor(asset.id)
-  const emp    = cur ? EMPLOYEE_BY_ID[cur.employeeId] : null
-  const history = historyFor(asset.id)
+  const [asset, setAsset]     = useState<AssetDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    getAsset(id).then(a => {
+      setAsset(a as AssetDetail | null)
+      setLoading(false)
+    })
+  }, [id])
+
+  if (loading) return <Loading />
+  if (!asset) {
+    return (
+      <div style={{ padding: 40 }}>
+        <EmptyState icon="package" title="Asset not found"
+          message="This asset does not exist or may have been removed." />
+      </div>
+    )
+  }
+
+  const co     = asset.company
+  const history = (asset.assignments ?? []).slice().sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
+  const cur    = history.find(a => a.returnedAt == null)
+  const emp    = cur?.employee ?? null
+
+  const transferHistory = (asset.transfers ?? []).slice()
+    .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
 
   const specs = [asset.processor, asset.ram, asset.storage, asset.operatingSystem].filter(Boolean)
 
@@ -148,9 +167,9 @@ function AssetDetailContent({ id }: { id: string }) {
           <SectionTitle>Asset details</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, rowGap: 24 }}>
             <KV label="Company">
-              {co && <CompanyChip code={co.code} name={co.name} />}
+              {co && <CompanyChip code={co.code} name={co.name} logoUrl={co.logoUrl} />}
             </KV>
-            <KV label="Branch">{BRANCH_BY_ID[asset.branchId]?.name}</KV>
+            <KV label="Branch">{asset.branch?.name}</KV>
             <KV label="Type"><TypeChip type={asset.type} /></KV>
             <KV label="Asset Tag" mono>{asset.assetTag}</KV>
             <KV label="Brand">{asset.brand}</KV>
@@ -200,15 +219,10 @@ function AssetDetailContent({ id }: { id: string }) {
                   </div>
                 </div>
                 <div className="row gap-2" style={{ marginBottom: 4 }}>
-                  {COMPANY_BY_ID[emp.companyId] && (
-                    <CompanyChip
-                      code={COMPANY_BY_ID[emp.companyId].code}
-                      name={COMPANY_BY_ID[emp.companyId].name}
-                    />
-                  )}
+                  {co && <CompanyChip code={co.code} name={co.name} logoUrl={co.logoUrl} />}
                 </div>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
-                  {BRANCH_BY_ID[emp.branchId]?.name}
+                  {asset.branch?.name}
                 </div>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 16 }}>
                   Since {fmtDate(cur!.assignedAt)}
@@ -240,7 +254,8 @@ function AssetDetailContent({ id }: { id: string }) {
               <button className="btn btn-secondary row gap-2" style={{ justifyContent: 'flex-start' }}>
                 <Icon name="download" size={14} />Download Asset Report
               </button>
-              <button className="btn btn-secondary row gap-2" style={{ justifyContent: 'flex-start' }}>
+              <button className="btn btn-secondary row gap-2" style={{ justifyContent: 'flex-start' }}
+                onClick={() => document.getElementById('transfer-history')?.scrollIntoView({ behavior: 'smooth' })}>
                 <Icon name="history" size={14} />View Transfer History
               </button>
             </div>
@@ -277,8 +292,8 @@ function AssetDetailContent({ id }: { id: string }) {
             </thead>
             <tbody>
               {history.map(a => {
-                const e = EMPLOYEE_BY_ID[a.employeeId]
-                const eCo = e ? COMPANY_BY_ID[e.companyId] : null
+                const e = a.employee
+                const eCo = co
                 if (!e) return null
                 return (
                   <tr key={a.id}>
@@ -290,7 +305,7 @@ function AssetDetailContent({ id }: { id: string }) {
                     </td>
                     <td style={{ fontSize: 13 }}>{e.jobTitle}</td>
                     <td>
-                      {eCo && <CompanyChip code={eCo.code} name={eCo.name} />}
+                      {eCo && <CompanyChip code={eCo.code} name={eCo.name} logoUrl={eCo.logoUrl} />}
                     </td>
                     <td className="muted" style={{ fontSize: 13 }}>{fmtDate(a.assignedAt)}</td>
                     <td>
@@ -307,6 +322,54 @@ function AssetDetailContent({ id }: { id: string }) {
                   </tr>
                 )
               })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Transfer history */}
+      <div id="transfer-history" className="card" style={{ overflow: 'hidden', marginTop: 16 }}>
+        <div className="row" style={{
+          padding: '16px 20px', borderBottom: '1px solid var(--border)',
+          justifyContent: 'space-between',
+        }}>
+          <h3 className="t-h3" style={{ margin: 0 }}>Transfer History</h3>
+          <span className="muted" style={{ fontSize: 13 }}>{transferHistory.length} record(s)</span>
+        </div>
+        {transferHistory.length === 0 ? (
+          <div style={{ padding: 40 }}>
+            <EmptyState icon="history" title="No transfers yet" />
+          </div>
+        ) : (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Date</th>
+                <th>Reason</th>
+                <th>Processed by</th>
+                <th>Authorised by</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {transferHistory.map(t => (
+                <tr key={t.id}>
+                  <td className="t-mono" style={{ fontSize: 13 }}>{t.referenceNumber}</td>
+                  <td className="muted" style={{ fontSize: 13 }}>{fmtDate(t.generatedAt)}</td>
+                  <td>
+                    <KindBadge kind="out">{TRANSFER_REASON_LABEL[t.reason as TransferReason]}</KindBadge>
+                  </td>
+                  <td style={{ fontSize: 13 }}>{t.processedBy}</td>
+                  <td style={{ fontSize: 13 }}>{t.authorisedBy}</td>
+                  <td>
+                    <button className="btn btn-secondary btn-sm row gap-2"
+                      onClick={() => router.push(`/assets/transfers/${t.id}`)}>
+                      <Icon name="eye" size={14} />View / Print
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}

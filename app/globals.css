@@ -293,6 +293,33 @@ body[data-density="spacious"] { --row-padding-y: 16px; --row-padding-x: 20px; --
   border: 1px solid var(--border);
 }
 
+/* ─── Print: show only the waybill document ─────────────────────────────────── */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .app-main * {
+    visibility: hidden;
+  }
+  .waybill-doc, .waybill-doc * {
+    visibility: visible;
+  }
+  .waybill-doc {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    min-height: 297mm !important;
+    margin: 0;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  @page {
+    margin: 12mm;
+  }
+}
+
 /* ─── Lettermark ─────────────────────────────────────────────────────────────── */
 .lettermark {
   display: inline-flex;

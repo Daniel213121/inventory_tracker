@@ -11,7 +11,6 @@ import { StockChartCard }      from '../../components/dashboard/StockChartCard'
 import { StatCard }            from '../../components/ui/StatCard'
 import { getDashboardData }    from '../actions/dashboard'
 import type { DashboardData }  from '../actions/dashboard'
-import { ASSETS, ASSET_TRANSFERS } from '../../lib/data'
 
 /* ─── Layout variants ──────────────────────────────────────────────────── */
 
@@ -35,27 +34,27 @@ function DashboardContent({ data }: { data: DashboardData }) {
         <StatCard
           icon="monitor"
           label="Total Assets"
-          value={ASSETS.length}
+          value={data.totalAssets}
           sub="Laptops, phones, tablets, monitors"
         />
         <StatCard
           icon="user"
           label="Assets Assigned"
-          value={ASSETS.filter(a => a.status === 'ASSIGNED').length}
+          value={data.assetsAssigned}
           accent="#2563EB"
           sub="Currently with employees"
         />
         <StatCard
           icon="alert"
           label="Assets Unassigned"
-          value={ASSETS.filter(a => a.status === 'AVAILABLE').length}
+          value={data.assetsUnassigned}
           accent="#D97706"
           sub="Available in store"
         />
         <StatCard
           icon="history"
           label="Transfers This Month"
-          value={ASSET_TRANSFERS.length}
+          value={data.transfersThisMonth}
           accent="#16A34A"
           sub="Change of asset documents"
         />

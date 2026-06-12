@@ -102,13 +102,6 @@ export function InventoryTable({ items }: Props) {
                 <div className="row gap-2">
                   <button
                     className="btn btn-ghost btn-sm"
-                    onClick={() => router.push(`/inventory/${item.id}`)}
-                    title="View"
-                  >
-                    <Icon name="eye" size={15} />
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
                     onClick={() => router.push(`/inventory/${item.id}/edit`)}
                     title="Edit"
                   >

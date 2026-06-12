@@ -12,13 +12,14 @@ import { Icon }         from '../../../components/icons/Icon'
 import { Loading }      from '../../../components/ui/Loading'
 import { fmtDate }      from '../../../lib/utils'
 import {
-  ASSETS, ASSET_BY_ID, EMPLOYEES, EMPLOYEE_BY_ID,
-  ASSET_ASSIGNMENTS, COMPANY_BY_ID,
   ASSET_TYPE_LABEL, ASSET_TYPE_ICON,
   ASSET_STATUS_LABEL, ASSET_CONDITION_LABEL,
   TRANSFER_REASON_LABEL, TRANSFER_REASON_ICON,
 } from '../../../lib/data'
-import type { AssetType, AssetStatus, AssetCondition, TransferReason } from '../../../lib/types'
+import { listAssets, getAsset, createAssetTransfer } from '../../../app/actions/assets'
+import { listEmployees } from '../../../app/actions/employees'
+import { listCompanies } from '../../../app/actions/settings'
+import type { AssetType, AssetStatus, AssetCondition, TransferReason, Asset, Employee, Company, AssetAssignment } from '../../../lib/types'
 
 // ─── Local helpers ────────────────────────────────────────────────────────
 
@@ -50,8 +51,9 @@ function NameAvatar({ name, size = 32 }: { name: string; size?: number }) {
   )
 }
 
-function currentEmployeeFor(assetId: string) {
-  return ASSET_ASSIGNMENTS.find(a => a.assetId === assetId && a.returnedAt == null)
+type AssetDetail = Asset & {
+  company?: Company
+  assignments?: (AssetAssignment & { employee?: Employee })[]
 }
 
 const REASON_CONFIG: Record<TransferReason, { accent: string; desc: string }> = {
@@ -110,41 +112,77 @@ function TransferContent() {
   const [authorisedBy,       setAuthorisedBy]      = useState('')
   const [saving,             setSaving]            = useState(false)
 
-  const [authUser, setAuthUser] = useState<{ name: string } | null>(null)
+  const [authUser, setAuthUser] = useState<{ id: string; name: string; email: string } | null>(null)
   useEffect(() => {
     const stored = localStorage.getItem('auth_user')
     if (stored) setAuthUser(JSON.parse(stored))
   }, [])
 
-  const asset  = selectedAssetId ? ASSET_BY_ID[selectedAssetId] : null
-  const cur    = asset ? currentEmployeeFor(asset.id) : null
-  const curEmp = cur ? EMPLOYEE_BY_ID[cur.employeeId] : null
-  const co     = asset ? COMPANY_BY_ID[asset.companyId] : null
+  const [asset, setAsset]               = useState<AssetDetail | null>(null)
+  const [assignedAssets, setAssignedAssets] = useState<Asset[]>([])
+  const [employees, setEmployees]       = useState<Employee[]>([])
+  const [companies, setCompanies]       = useState<Company[]>([])
+  const [assignedEmpMap, setAssignedEmpMap] = useState<Record<string, Employee | undefined>>({})
+
+  useEffect(() => {
+    listEmployees({ active: true, pageSize: 1000 }).then(r => setEmployees(r.items as unknown as Employee[]))
+    listCompanies().then(setCompanies)
+    listAssets({ status: 'ASSIGNED', pageSize: 1000 }).then(r => setAssignedAssets(r.items as unknown as Asset[]))
+  }, [])
+
+  useEffect(() => {
+    if (selectedAssetId) {
+      getAsset(selectedAssetId).then(a => setAsset(a as unknown as AssetDetail | null))
+    } else {
+      setAsset(null)
+    }
+  }, [selectedAssetId])
+
+  // resolve "currently assigned to" employee for each asset shown in step 1 list
+  useEffect(() => {
+    let cancelled = false
+    Promise.all(assignedAssets.map(a => getAsset(a.id))).then(results => {
+      if (cancelled) return
+      const map: Record<string, Employee | undefined> = {}
+      results.forEach((r, i) => {
+        const d = r as unknown as AssetDetail | null
+        const cur = (d?.assignments ?? []).find(x => x.returnedAt == null)
+        map[assignedAssets[i].id] = cur?.employee
+      })
+      setAssignedEmpMap(map)
+    })
+    return () => { cancelled = true }
+  }, [assignedAssets])
+
+  const co     = asset?.company
+  const cur    = (asset?.assignments ?? []).find(a => a.returnedAt == null) ?? null
+  const curEmp = cur?.employee ?? null
+
+  function companyCodeFor(companyId: string) {
+    return companies.find(c => c.id === companyId)?.code
+  }
 
   const refPreview = asset && co
     ? `${co.code}/ASSET/XXX/26`
     : '—'
 
   async function handleConfirm() {
-    if (!selectedAssetId || !reason || !authorisedBy) return
+    if (!selectedAssetId || !reason || !authorisedBy || !asset || !authUser) return
     setSaving(true)
     try {
-      const res = await fetch('/api/assets/transfer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assetId: selectedAssetId, reason, reasonNotes,
-          fromCondition: fromCondition || undefined,
-          returnedAt: returnedAt || undefined,
-          toEmployeeId: toEmployeeId || undefined,
-          assignedAt: assignedAt || undefined,
-          authorisedBy,
-        }),
+      const result = await createAssetTransfer({
+        assetId: selectedAssetId,
+        companyId: asset.companyId,
+        fromEmployeeId: curEmp?.id || undefined,
+        fromCondition: fromCondition || undefined,
+        reason,
+        reasonNotes: reasonNotes || undefined,
+        toEmployeeId: toEmployeeId || undefined,
+        processedBy: authUser.name,
+        authorisedBy,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Failed to generate transfer')
-      toast.success(`${data.referenceNumber} generated`)
-      router.push(`/assets/transfers/${data.id}`)
+      toast.success(`${result.referenceNumber} generated`)
+      router.push(`/assets/transfers/${result.id}`)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -210,7 +248,7 @@ function TransferContent() {
                       <div className="col">
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{curEmp.name}</div>
                         <div className="muted" style={{ fontSize: 12 }}>
-                          {curEmp.jobTitle} · {COMPANY_BY_ID[curEmp.companyId]?.code}
+                          {curEmp.jobTitle} · {companyCodeFor(curEmp.companyId)}
                         </div>
                       </div>
                       <span className="muted" style={{ fontSize: 12 }}>
@@ -231,9 +269,8 @@ function TransferContent() {
                 border: '1px solid var(--border)', borderRadius: 8,
                 maxHeight: 360, overflow: 'auto',
               }}>
-                {ASSETS.filter(a => a.status === 'ASSIGNED').map(a => {
-                  const c = currentEmployeeFor(a.id)
-                  const e = c ? EMPLOYEE_BY_ID[c.employeeId] : null
+                {assignedAssets.map(a => {
+                  const e = assignedEmpMap[a.id]
                   return (
                     <div key={a.id} className="row" style={{
                       padding: 12, borderBottom: '1px solid var(--border)',
@@ -364,14 +401,11 @@ function TransferContent() {
                           <select className="select" value={toEmployeeId}
                             onChange={e => setToEmployeeId(e.target.value)}>
                             <option value="">Select employee…</option>
-                            {EMPLOYEES.filter(e => e.active).map(e => {
-                              const c = COMPANY_BY_ID[e.companyId]
-                              return (
-                                <option key={e.id} value={e.id}>
-                                  {e.name} — {e.jobTitle} ({c?.code})
-                                </option>
-                              )
-                            })}
+                            {employees.map(e => (
+                              <option key={e.id} value={e.id}>
+                                {e.name} — {e.jobTitle} ({companyCodeFor(e.companyId)})
+                              </option>
+                            ))}
                           </select>
                         </FormRow>
                       </div>
@@ -388,14 +422,11 @@ function TransferContent() {
                   <select className="select" value={toEmployeeId}
                     onChange={e => setToEmployeeId(e.target.value)}>
                     <option value="">Select employee…</option>
-                    {EMPLOYEES.filter(e => e.active).map(e => {
-                      const c = COMPANY_BY_ID[e.companyId]
-                      return (
-                        <option key={e.id} value={e.id}>
-                          {e.name} — {e.jobTitle} ({c?.code})
-                        </option>
-                      )
-                    })}
+                    {employees.map(e => (
+                      <option key={e.id} value={e.id}>
+                        {e.name} — {e.jobTitle} ({companyCodeFor(e.companyId)})
+                      </option>
+                    ))}
                   </select>
                 </FormRow>
                 <FormRow label="Date assigned" required>
@@ -423,7 +454,7 @@ function TransferContent() {
               ['Previous holder', curEmp?.name ?? '—'],
               ['Reason', reason ? TRANSFER_REASON_LABEL[reason as TransferReason] : '—'],
               ['New holder', toEmployeeId
-                ? EMPLOYEE_BY_ID[toEmployeeId]?.name
+                ? employees.find(e => e.id === toEmployeeId)?.name
                 : <span key="nh" style={{ fontStyle: 'italic' }} className="muted">
                     {reason === 'BEYOND_REPAIR' ? 'Asset being retired' : 'Returning to store'}
                   </span>],

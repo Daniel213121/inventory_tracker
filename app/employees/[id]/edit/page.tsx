@@ -1,22 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { toast }        from 'sonner'
-import { AppShell }     from '../../../components/layout/AppShell'
-import { PageHeader }   from '../../../components/ui/PageHeader'
-import { SectionTitle } from '../../../components/ui/SectionTitle'
-import { FormRow }      from '../../../components/ui/FormRow'
-import { Icon }         from '../../../components/icons/Icon'
-import { Loading }      from '../../../components/ui/Loading'
-import { createEmployee } from '../../../app/actions/employees'
-import { listCompanies, listBranches, createBranch } from '../../../app/actions/settings'
-import type { Company, Branch } from '../../../lib/types'
+import { AppShell }     from '../../../../components/layout/AppShell'
+import { PageHeader }   from '../../../../components/ui/PageHeader'
+import { SectionTitle } from '../../../../components/ui/SectionTitle'
+import { FormRow }      from '../../../../components/ui/FormRow'
+import { Icon }         from '../../../../components/icons/Icon'
+import { Loading }      from '../../../../components/ui/Loading'
+import { getEmployee, updateEmployee } from '../../../../app/actions/employees'
+import { listCompanies, listBranches, createBranch } from '../../../../app/actions/settings'
+import type { Company, Branch, Employee } from '../../../../lib/types'
 
 // ─── Content ──────────────────────────────────────────────────────────────
 
-function AddEmployeeContent() {
+function EditEmployeeContent({ id }: { id: string }) {
   const router = useRouter()
+  const [employee, setEmployee] = useState<Employee | null>(null)
+  const [loading, setLoading]   = useState(true)
 
   const [companyId, setCompanyId]   = useState('')
   const [branchId, setBranchId]     = useState('')
@@ -36,8 +38,6 @@ function AddEmployeeContent() {
   const [newBranchName, setNewBranchName]   = useState('')
   const [branchSaving, setBranchSaving]     = useState(false)
 
-  useEffect(() => { setBranchId('') }, [companyId])
-
   useEffect(() => {
     listCompanies().then(setCompanies)
   }, [])
@@ -46,15 +46,25 @@ function AddEmployeeContent() {
     listBranches(companyId || undefined).then(setBranches)
   }, [companyId])
 
-  function handleEmailChange(value: string) {
-    const domain = companies.find(c => c.id === companyId)?.email?.split('@')[1]
-    if (domain) {
-      const local = value.split('@')[0]
-      setEmail(local ? `${local}@${domain}` : '')
-    } else {
-      setEmail(value)
-    }
-  }
+  useEffect(() => {
+    setLoading(true)
+    getEmployee(id).then(emp => {
+      if (emp) {
+        const ex = emp as Employee
+        setEmployee(ex)
+        setCompanyId(ex.companyId)
+        setBranchId(ex.branchId)
+        setName(ex.name)
+        setJobTitle(ex.jobTitle)
+        setDepartment(ex.department)
+        setEmployeeId(ex.employeeId ?? '')
+        setJoinedAt(ex.joinedAt.slice(0, 10))
+        setEmail(ex.email ?? '')
+        setPhone(ex.phone ?? '')
+      }
+      setLoading(false)
+    })
+  }, [id])
 
   function handleBranchChange(value: string) {
     if (value === '__add_new__') { setIsAddingBranch(true); return }
@@ -62,11 +72,11 @@ function AddEmployeeContent() {
   }
 
   async function confirmNewBranch() {
-    const name = newBranchName.trim()
-    if (!name || !companyId) return
+    const branchName = newBranchName.trim()
+    if (!branchName || !companyId) return
     setBranchSaving(true)
     try {
-      const branch = await createBranch(name, companyId)
+      const branch = await createBranch(branchName, companyId)
       setBranches(prev => [...prev, branch])
       setBranchId(branch.id)
       setIsAddingBranch(false)
@@ -82,15 +92,15 @@ function AddEmployeeContent() {
     e.preventDefault()
     setSaving(true)
     try {
-      const employee = await createEmployee({
+      await updateEmployee(id, {
         companyId, branchId, name, jobTitle, department,
-        employeeId: employeeId || undefined,
+        employeeId: employeeId || null,
         joinedAt,
-        email: email || undefined,
-        phone: phone || undefined,
+        email: email || null,
+        phone: phone || null,
       })
-      toast.success(`${name} added successfully`)
-      router.push(`/employees/${employee.id}`)
+      toast.success(`${name} updated`)
+      router.push(`/employees/${id}`)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -100,17 +110,22 @@ function AddEmployeeContent() {
 
   const availBranches = branches
 
+  if (loading || !employee) return <Loading />
+
   return (
     <div>
       <PageHeader
-        title="Add Employee"
-        subtitle="Onboard a new staff member — required before any device can be assigned to them."
+        title={`Edit ${employee.name}`}
+        subtitle="Update employee details."
         breadcrumb={
           <>
             <button className="btn btn-ghost btn-sm" style={{ padding: 0 }}
               onClick={() => router.push('/employees')}>Employees</button>
             <Icon name="chevronRight" size={14} stroke="var(--text-2)" />
-            <span>Add new</span>
+            <button className="btn btn-ghost btn-sm" style={{ padding: 0 }}
+              onClick={() => router.push(`/employees/${id}`)}>{employee.name}</button>
+            <Icon name="chevronRight" size={14} stroke="var(--text-2)" />
+            <span>Edit</span>
           </>
         }
       />
@@ -123,7 +138,7 @@ function AddEmployeeContent() {
 
               <FormRow label="Company" required>
                 <select className="select" value={companyId}
-                  onChange={e => setCompanyId(e.target.value)} required>
+                  onChange={e => { setCompanyId(e.target.value); setBranchId('') }} required>
                   <option value="">Select company…</option>
                   {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -152,23 +167,23 @@ function AddEmployeeContent() {
               <div style={{ gridColumn: 'span 2' }}>
                 <FormRow label="Full Name" required>
                   <input className="input" value={name} onChange={e => setName(e.target.value)}
-                    placeholder="e.g. Felix Anane" required />
+                    placeholder="e.g. Kwame Mensah" required />
                 </FormRow>
               </div>
 
               <FormRow label="Job Title" required>
                 <input className="input" value={jobTitle} onChange={e => setJobTitle(e.target.value)}
-                  placeholder="e.g. IT Manager" required />
+                  placeholder="e.g. Accountant" required />
               </FormRow>
 
               <FormRow label="Department" required>
                 <input className="input" value={department} onChange={e => setDepartment(e.target.value)}
-                  placeholder="e.g. Information Technology" required />
+                  placeholder="e.g. Finance" required />
               </FormRow>
 
-              <FormRow label="Employee ID" hint="Internal staff number, if any">
-                <input className="input" value={employeeId} onChange={e => setEmployeeId(e.target.value)}
-                  placeholder="VSA-0142" />
+              <FormRow label="Employee ID" hint="Optional, must be unique">
+                <input className="input t-mono" value={employeeId} onChange={e => setEmployeeId(e.target.value)}
+                  placeholder="e.g. VSA-0042" />
               </FormRow>
 
               <FormRow label="Date Joined" required>
@@ -177,27 +192,29 @@ function AddEmployeeContent() {
               </FormRow>
 
               <FormRow label="Email">
-                <input className="input" type="email" value={email}
-                  onChange={e => handleEmailChange(e.target.value)}
-                  placeholder="felix.anane@virtualsecurity.africa" />
+                <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="name@company.com" />
               </FormRow>
 
               <FormRow label="Phone">
                 <input className="input" value={phone} onChange={e => setPhone(e.target.value)}
-                  placeholder="+233 24 411 2098" />
+                  placeholder="0XX XXX XXXX" />
               </FormRow>
 
             </div>
           </div>
 
+          {/* Actions */}
           <div className="row gap-2" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
             <button type="button" className="btn btn-secondary"
-              onClick={() => router.push('/employees')}>Cancel</button>
-            <button type="submit" className="btn btn-primary row gap-2" disabled={saving}>
-              <Icon name="plus" size={14} />
-              {saving ? 'Saving…' : 'Add Employee'}
+              onClick={() => router.push(`/employees/${id}`)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
+
         </div>
       </form>
     </div>
@@ -206,8 +223,9 @@ function AddEmployeeContent() {
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 
-export default function AddEmployeePage() {
+export default function EditEmployeePage() {
   const router = useRouter()
+  const params = useParams<{ id: string }>()
   const [user, setUser] = useState<{ id: string; name: string; email: string } | null>(null)
 
   useEffect(() => {
@@ -220,7 +238,7 @@ export default function AddEmployeePage() {
 
   return (
     <AppShell user={user} onLogout={() => { localStorage.removeItem('auth_user'); router.push('/login') }}>
-      <AddEmployeeContent />
+      <EditEmployeeContent id={params.id} />
     </AppShell>
   )
 }

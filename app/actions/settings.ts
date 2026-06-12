@@ -14,6 +14,24 @@ export async function getCompany(id: string) {
   return prisma.company.findUnique({ where: { id } })
 }
 
+export async function listBranches(companyId?: string) {
+  const branches = await prisma.branch.findMany({
+    where:   companyId && companyId !== 'all' ? { companyId } : {},
+    orderBy: { name: 'asc' },
+  })
+  return branches.map(b => ({ ...b, createdAt: b.createdAt.toISOString() }))
+}
+
+export async function createBranch(name: string, companyId: string) {
+  const actor = await getCurrentUser()
+  if (!actor) throw new Error('Unauthorized')
+
+  const branch = await prisma.branch.create({
+    data: { name: name.trim(), companyId },
+  })
+  return { ...branch, createdAt: branch.createdAt.toISOString() }
+}
+
 // ─── Mutation ─────────────────────────────────────────────────────────────────
 
 export async function updateCompany(id: string, data: {

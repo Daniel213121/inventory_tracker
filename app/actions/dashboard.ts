@@ -23,17 +23,28 @@ export type DashboardInventorySummary = {
 }
 
 export type DashboardData = {
-  totalItems:      number
-  itemsOut:        number
-  waybillCount:    number
-  recentMovements: DashboardMovement[]
-  companies:       { id: string; name: string; code: string }[]
-  categories:      { id: string; label: string }[]
-  inventory:       DashboardInventorySummary[]
+  totalItems:        number
+  itemsOut:          number
+  waybillCount:      number
+  recentMovements:   DashboardMovement[]
+  companies:         { id: string; name: string; code: string }[]
+  categories:        { id: string; label: string }[]
+  inventory:         DashboardInventorySummary[]
+  totalAssets:       number
+  assetsAssigned:    number
+  assetsUnassigned:  number
+  transfersThisMonth: number
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  const [inventoryItems, allMovements, waybillCount, companies, categories] = await Promise.all([
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+
+  const [
+    inventoryItems, allMovements, waybillCount, companies, categories,
+    totalAssets, assetsAssigned, assetsUnassigned, transfersThisMonth,
+  ] = await Promise.all([
     prisma.inventoryItem.findMany({
       select: {
         id:           true,
@@ -57,6 +68,14 @@ export async function getDashboardData(): Promise<DashboardData> {
     prisma.company.findMany({ orderBy: { name: 'asc' } }),
 
     prisma.category.findMany({ orderBy: { label: 'asc' } }),
+
+    prisma.asset.count(),
+
+    prisma.asset.count({ where: { status: 'ASSIGNED' } }),
+
+    prisma.asset.count({ where: { status: 'AVAILABLE' } }),
+
+    prisma.assetTransfer.count({ where: { generatedAt: { gte: startOfMonth } } }),
   ])
 
   type InvRow  = typeof inventoryItems[number]
@@ -112,5 +131,9 @@ export async function getDashboardData(): Promise<DashboardData> {
     companies: companies.map((c: CompRow) => ({ id: c.id, name: c.name, code: c.code })),
     categories: categories.map((c: CatRow) => ({ id: c.id, label: c.label })),
     inventory,
+    totalAssets,
+    assetsAssigned,
+    assetsUnassigned,
+    transfersThisMonth,
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AppShell }    from '../../components/layout/AppShell'
 import { PageHeader }  from '../../components/ui/PageHeader'
@@ -14,12 +14,11 @@ import {
   PaginationLink, PaginationNext, PaginationPrevious,
 } from '../../components/ui/pagination'
 import {
-  EMPLOYEES, BRANCHES, BRANCH_BY_ID, EMPLOYEE_BY_ID,
-  COMPANIES, COMPANY_BY_ID,
-  ASSET_ASSIGNMENTS,
   ASSET_TYPE_LABEL, ASSET_TYPE_ICON,
 } from '../../lib/data'
-import type { AssetType } from '../../lib/types'
+import { listEmployees } from '../../app/actions/employees'
+import { listCompanies, listBranches } from '../../app/actions/settings'
+import type { AssetType, Employee, Company, Branch } from '../../lib/types'
 
 const PAGE_SIZE = 12
 
@@ -48,10 +47,6 @@ function NameAvatar({ name, size = 32 }: { name: string; size?: number }) {
   )
 }
 
-function branchesFor(companyId: string) {
-  return companyId ? BRANCHES.filter(b => b.companyId === companyId) : BRANCHES
-}
-
 // ─── Content ──────────────────────────────────────────────────────────────
 
 function EmployeesContent() {
@@ -64,39 +59,60 @@ function EmployeesContent() {
   const [empStatus, setEmpStatus] = useState<'active' | 'resigned' | 'all'>('active')
   const [page, setPage]       = useState(1)
 
+  const [loading, setLoading] = useState(true)
+  const [paged, setPaged]     = useState<Employee[]>([])
+  const [total, setTotal]     = useState(0)
+  const [pages, setPages]     = useState(1)
+  const [employeeCount, setEmployeeCount] = useState(0)
+  const [active, setActive]   = useState(0)
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [branches, setBranches]   = useState<Branch[]>([])
+  const [departments, setDepartments] = useState<string[]>([])
+
   useEffect(() => { setBranch(''); setPage(1) }, [company])
 
-  const departments = useMemo(() =>
-    [...new Set(EMPLOYEES.map(e => e.department))].sort(),
-  [])
-
-  const filtered = useMemo(() => {
-    const lq = q.toLowerCase()
-    return EMPLOYEES.filter(e => {
-      if (company && e.companyId !== company) return false
-      if (branch  && e.branchId  !== branch)  return false
-      if (dept    && e.department !== dept)    return false
-      if (empStatus === 'active'  && !e.active) return false
-      if (empStatus === 'resigned' &&  e.active) return false
-      if (q) {
-        const hay = [e.name, e.jobTitle, e.department, e.employeeId ?? ''].join(' ').toLowerCase()
-        if (!hay.includes(lq)) return false
-      }
-      return true
+  useEffect(() => {
+    listCompanies().then(setCompanies)
+    listEmployees({ pageSize: 1000 }).then(r => {
+      setEmployeeCount(r.total)
+      setActive((r.items as unknown as Employee[]).filter(e => e.active).length)
+      setDepartments([...new Set((r.items as unknown as Employee[]).map(e => e.department))].sort())
     })
-  }, [q, company, branch, dept, empStatus])
+  }, [])
 
-  const total  = filtered.length
-  const active = EMPLOYEES.filter(e => e.active).length
-  const pages  = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const paged  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const availBranches = branchesFor(company)
+  useEffect(() => {
+    listBranches(company || undefined).then(setBranches)
+  }, [company])
+
+  useEffect(() => {
+    setLoading(true)
+    listEmployees({
+      companyId:  company || undefined,
+      branchId:   branch  || undefined,
+      department: dept    || undefined,
+      active:     empStatus === 'all' ? undefined : empStatus === 'active',
+      search:     q || undefined,
+      page, pageSize: PAGE_SIZE,
+    }).then(r => {
+      setPaged(r.items as unknown as Employee[])
+      setTotal(r.total)
+      setPages(r.pages)
+      setLoading(false)
+    })
+  }, [q, company, branch, dept, empStatus, page])
+
+  function assetCountFor(e: Employee) {
+    return ((e as unknown as { assetAssignments?: { returnedAt: string | null }[] }).assetAssignments ?? [])
+      .filter(a => a.returnedAt == null).length
+  }
+
+  const availBranches = branches
 
   return (
     <div>
       <PageHeader
         title="Employees"
-        subtitle={`${EMPLOYEES.length} employees · ${active} active across both companies`}
+        subtitle={`${employeeCount} employees · ${active} active across both companies`}
         actions={
           <>
             <button className="btn btn-secondary btn-sm row gap-2">
@@ -119,7 +135,7 @@ function EmployeesContent() {
             <select className="select" style={{ width: 150 }}
               value={company} onChange={e => { setCompany(e.target.value); setPage(1) }}>
               <option value="">All companies</option>
-              {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
+              {companies.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
             </select>
             <select className="select" style={{ width: 150 }}
               value={branch} onChange={e => { setBranch(e.target.value); setPage(1) }}>
@@ -158,19 +174,25 @@ function EmployeesContent() {
             </tr>
           </thead>
           <tbody>
-            {paged.length === 0 && (
+            {loading && (
+              <tr>
+                <td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-2)' }}>
+                  Loading…
+                </td>
+              </tr>
+            )}
+            {!loading && paged.length === 0 && (
               <tr>
                 <td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-2)' }}>
                   No employees match your filters
                 </td>
               </tr>
             )}
-            {paged.map(e => {
-              const co = COMPANY_BY_ID[e.companyId]
-              const branchName = BRANCH_BY_ID[e.branchId]?.name ?? ''
-              const assetCount = ASSET_ASSIGNMENTS.filter(
-                a => a.employeeId === e.id && a.returnedAt == null
-              ).length
+            {!loading && paged.map(e => {
+              const co = (e as unknown as { company?: Company }).company ?? companies.find(c => c.id === e.companyId)
+              const branchName = (e as unknown as { branch?: Branch }).branch?.name
+                ?? branches.find(b => b.id === e.branchId)?.name ?? ''
+              const assetCount = assetCountFor(e)
               return (
                 <tr key={e.id} onClick={() => router.push(`/employees/${e.id}`)}
                   style={{ cursor: 'pointer' }}>
@@ -187,7 +209,7 @@ function EmployeesContent() {
                   </td>
                   <td style={{ fontSize: 13 }}>{e.jobTitle}</td>
                   <td style={{ fontSize: 13 }}>{e.department}</td>
-                  <td>{co && <CompanyChip code={co.code} name={co.name} />}</td>
+                  <td>{co && <CompanyChip code={co.code} name={co.name} logoUrl={co.logoUrl} />}</td>
                   <td className="muted" style={{ fontSize: 13 }}>{branchName}</td>
                   <td><StatusBadge active={e.active} /></td>
                   <td>
@@ -198,10 +220,7 @@ function EmployeesContent() {
                   <td onClick={ev => ev.stopPropagation()}>
                     <div className="row gap-2" style={{ justifyContent: 'flex-end' }}>
                       <button className="btn btn-ghost btn-sm"
-                        onClick={() => router.push(`/employees/${e.id}`)}>
-                        <Icon name="eye" size={14} />
-                      </button>
-                      <button className="btn btn-ghost btn-sm">
+                        onClick={() => router.push(`/employees/${e.id}/edit`)}>
                         <Icon name="edit" size={14} />
                       </button>
                       {e.active && (

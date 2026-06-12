@@ -39,10 +39,10 @@ export function AppShell({ user, onLogout, children }: AppShellProps) {
       <TweaksContext.Provider value={tweaks}>
         <SidebarProvider>
           <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)', width: '100%' }}>
-            <AppSidebar onLogout={handleLogout} />
+            <div className="no-print"><AppSidebar onLogout={handleLogout} /></div>
             <SidebarInset className="col" style={{ flex: 1, minWidth: 0 }}>
-              <TopBar user={user} onLogout={handleLogout} />
-              <main style={{ padding: '28px 32px 64px', flex: 1, minWidth: 0 }}>
+              <div className="no-print"><TopBar user={user} onLogout={handleLogout} /></div>
+              <main className="app-main" style={{ padding: '28px 32px 64px', flex: 1, minWidth: 0 }}>
                 {children}
               </main>
             </SidebarInset>
@@ -104,7 +104,7 @@ export function AppShell({ user, onLogout, children }: AppShellProps) {
 
         <button
           onClick={() => tweaks.setOpen(!tweaks.open)}
-          className="btn btn-secondary btn-sm"
+          className="btn btn-secondary btn-sm no-print"
           style={{
             position: 'fixed',
             bottom: 24,

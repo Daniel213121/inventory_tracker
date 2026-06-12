@@ -12,11 +12,13 @@ import { KindBadge }    from '../../../components/ui/badges'
 import { Icon }         from '../../../components/icons/Icon'
 import { Loading }      from '../../../components/ui/Loading'
 import {
-  ASSETS, ASSET_BY_ID, EMPLOYEES, EMPLOYEE_BY_ID,
-  COMPANY_BY_ID, ASSET_TYPE_LABEL, ASSET_TYPE_ICON,
+  ASSET_TYPE_LABEL, ASSET_TYPE_ICON,
   ASSET_STATUS_LABEL,
 } from '../../../lib/data'
-import type { AssetType, AssetStatus } from '../../../lib/types'
+import { listAssets, getAsset, assignAsset } from '../../../app/actions/assets'
+import { listEmployees } from '../../../app/actions/employees'
+import { listCompanies } from '../../../app/actions/settings'
+import type { AssetType, AssetStatus, Asset, Employee, Company } from '../../../lib/types'
 
 // ─── Local helpers ────────────────────────────────────────────────────────
 
@@ -64,22 +66,50 @@ function AssignAssetContent() {
   const [notes,               setNotes]               = useState('')
   const [saving,              setSaving]              = useState(false)
 
-  const asset = selectedAssetId ? ASSET_BY_ID[selectedAssetId] : null
-  const emp   = selectedEmployeeId ? EMPLOYEE_BY_ID[selectedEmployeeId] : null
+  const [availableAssets, setAvailableAssets] = useState<Asset[]>([])
+  const [employees, setEmployees]             = useState<Employee[]>([])
+  const [companies, setCompanies]             = useState<Company[]>([])
+  const [asset, setAsset]                     = useState<Asset | null>(null)
+
+  const [authUser, setAuthUser] = useState<{ id: string; name: string; email: string } | null>(null)
+  useEffect(() => {
+    const stored = localStorage.getItem('auth_user')
+    if (stored) setAuthUser(JSON.parse(stored))
+  }, [])
+
+  useEffect(() => {
+    listAssets({ status: 'AVAILABLE', pageSize: 1000 }).then(r => setAvailableAssets(r.items as unknown as Asset[]))
+    listEmployees({ active: true, pageSize: 1000 }).then(r => setEmployees(r.items as unknown as Employee[]))
+    listCompanies().then(setCompanies)
+  }, [])
+
+  useEffect(() => {
+    if (selectedAssetId) {
+      getAsset(selectedAssetId).then(a => setAsset(a as unknown as Asset | null))
+    } else {
+      setAsset(null)
+    }
+  }, [selectedAssetId])
+
+  function companyCodeFor(companyId: string) {
+    return companies.find(c => c.id === companyId)?.code ?? companyId
+  }
+
+  const emp = selectedEmployeeId ? employees.find(e => e.id === selectedEmployeeId) ?? null : null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!selectedAssetId || !selectedEmployeeId) return
+    if (!selectedAssetId || !selectedEmployeeId || !authUser) return
     setSaving(true)
     try {
-      const res = await fetch('/api/assets/assign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assetId: selectedAssetId, employeeId: selectedEmployeeId, assignedAt, notes }),
+      await assignAsset({
+        assetId: selectedAssetId,
+        employeeId: selectedEmployeeId,
+        assignedBy: authUser.name,
+        assignedAt,
+        notes: notes || undefined,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Failed to assign')
-      toast.success(`Asset assigned to ${EMPLOYEE_BY_ID[selectedEmployeeId].name}`)
+      toast.success(`Asset assigned to ${emp?.name ?? 'employee'}`)
       router.push(`/assets/${selectedAssetId}`)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
@@ -141,7 +171,7 @@ function AssignAssetContent() {
                     <select className="select" value={selectedAssetId}
                       onChange={e => setSelectedAssetId(e.target.value)} required>
                       <option value="">Select an available asset…</option>
-                      {ASSETS.filter(a => a.status === 'AVAILABLE').map(a => (
+                      {availableAssets.map(a => (
                         <option key={a.id} value={a.id}>
                           {a.assetTag} — {a.brand} {a.model} ({a.serial})
                         </option>
@@ -169,12 +199,10 @@ function AssignAssetContent() {
                           <div className="muted" style={{ fontSize: 12 }}>{emp.jobTitle}</div>
                         </div>
                       </div>
-                      {COMPANY_BY_ID[emp.companyId] && (
-                        <CompanyChip
-                          code={COMPANY_BY_ID[emp.companyId].code}
-                          name={COMPANY_BY_ID[emp.companyId].name}
-                        />
-                      )}
+                      {(() => {
+                        const c = companies.find(c => c.id === emp.companyId)
+                        return c && <CompanyChip code={c.code} name={c.name} />
+                      })()}
                     </div>
                   </div>
                 ) : (
@@ -182,14 +210,11 @@ function AssignAssetContent() {
                     <select className="select" value={selectedEmployeeId}
                       onChange={e => setSelectedEmployeeId(e.target.value)} required>
                       <option value="">Select employee…</option>
-                      {EMPLOYEES.filter(e => e.active).map(e => {
-                        const co = COMPANY_BY_ID[e.companyId]
-                        return (
-                          <option key={e.id} value={e.id}>
-                            {e.name} — {e.jobTitle} ({co?.code ?? e.companyId})
-                          </option>
-                        )
-                      })}
+                      {employees.map(e => (
+                        <option key={e.id} value={e.id}>
+                          {e.name} — {e.jobTitle} ({companyCodeFor(e.companyId)})
+                        </option>
+                      ))}
                     </select>
                   </FormRow>
                 )}
